@@ -26,6 +26,8 @@ import java.util.stream.Collectors;
 
 public final class MongoParsing {
 
+    //TODO: use strict parsing as in JsonParsing; not just a simple change here...
+
     private MongoParsing() {
     }
 
