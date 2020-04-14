@@ -14,16 +14,12 @@
  * limitations under the License.
  */
 
-package com.hazelcast.jet.cdc.postgres;
+package com.hazelcast.jet.cdc;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.hazelcast.jet.JetInstance;
 import com.hazelcast.jet.Job;
 import com.hazelcast.jet.accumulator.LongAccumulator;
-import com.hazelcast.jet.cdc.ChangeEvent;
-import com.hazelcast.jet.cdc.ChangeEventElement;
-import com.hazelcast.jet.cdc.ChangeEventValue;
-import com.hazelcast.jet.cdc.Operation;
-import com.hazelcast.jet.cdc.postgres.data.Customer;
 import com.hazelcast.jet.config.JobConfig;
 import com.hazelcast.jet.config.ProcessingGuarantee;
 import com.hazelcast.jet.core.JetTestSupport;
@@ -39,6 +35,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import javax.annotation.Nonnull;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.util.Objects;
 import java.util.concurrent.CompletionException;
 
 import static com.hazelcast.jet.cdc.Operation.DELETE;
@@ -201,4 +198,46 @@ public class PostgreSqlIntegrationTest extends AbstractIntegrationTest {
     }
 
 
+    private static class Customer {
+
+        @JsonProperty("id")
+        public int id;
+
+        @JsonProperty("first_name")
+        public String firstName;
+
+        @JsonProperty("last_name")
+        public String lastName;
+
+        @JsonProperty("email")
+        public String email;
+
+        Customer() {
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(email, firstName, id, lastName);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+            Customer other = (Customer) obj;
+            return id == other.id
+                    && Objects.equals(firstName, other.firstName)
+                    && Objects.equals(lastName, other.lastName)
+                    && Objects.equals(email, other.email);
+        }
+
+        @Override
+        public String toString() {
+            return "Customer {id=" + id + ", firstName=" + firstName + ", lastName=" + lastName + ", email=" + email + '}';
+        }
+    }
 }

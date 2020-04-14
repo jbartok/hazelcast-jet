@@ -18,4 +18,4 @@
  * Contains connectors for change data capture events from MongoDB
  * databases.
  */
-package com.hazelcast.jet.cdc.mongodb;
+package com.hazelcast.jet.cdc;

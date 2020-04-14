@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.hazelcast.jet.cdc.mongodb;
+package com.hazelcast.jet.cdc.impl;
 
 import com.hazelcast.jet.cdc.ChangeEventKey;
 

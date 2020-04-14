@@ -15,7 +15,7 @@
  */
 
 /**
- * Contains connectors for change data capture events from PostgreSQL
+ * Contains connectors for change data capture events from SQL Server
  * databases.
  */
-package com.hazelcast.jet.cdc.postgres;
+package com.hazelcast.jet.cdc;

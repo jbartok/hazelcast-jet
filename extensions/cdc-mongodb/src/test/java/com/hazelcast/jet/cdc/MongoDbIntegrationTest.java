@@ -14,21 +14,16 @@
  * limitations under the License.
  */
 
-package com.hazelcast.jet.cdc.mongodb;
+package com.hazelcast.jet.cdc;
 
 import com.hazelcast.jet.JetInstance;
 import com.hazelcast.jet.Job;
-import com.hazelcast.jet.cdc.ChangeEvent;
-import com.hazelcast.jet.cdc.Operation;
-import com.hazelcast.jet.cdc.ParsingException;
 import com.hazelcast.jet.config.JobConfig;
 import com.hazelcast.jet.config.ProcessingGuarantee;
-import com.hazelcast.jet.core.JetTestSupport;
 import com.hazelcast.jet.core.JobStatus;
 import com.hazelcast.jet.pipeline.Pipeline;
 import com.hazelcast.jet.pipeline.StreamSource;
 import com.hazelcast.jet.pipeline.test.AssertionCompletedException;
-import com.hazelcast.test.HazelcastTestSupport;
 import org.bson.Document;
 import org.junit.Assert;
 import org.junit.Before;
@@ -101,9 +96,9 @@ public class MongoDbIntegrationTest extends AbstractIntegrationTest {
                 .writeTo(assertCollectedEventually(30, assertListFn(expectedEvents)));
 
         Job job = jet.newJob(pipeline);
-        JetTestSupport.assertJobStatusEventually(job, JobStatus.RUNNING);
+        assertJobStatusEventually(job, JobStatus.RUNNING);
 
-        HazelcastTestSupport.sleepAtLeastSeconds(10);
+        sleepAtLeastSeconds(10);
         // update record
         mongo.execInContainer("sh", "-c", "/usr/local/bin/alterData.sh");
 
@@ -158,11 +153,11 @@ public class MongoDbIntegrationTest extends AbstractIntegrationTest {
         JobConfig jobConfig = new JobConfig().setProcessingGuarantee(ProcessingGuarantee.AT_LEAST_ONCE);
 
         Job job = jet.newJob(pipeline, jobConfig);
-        JetTestSupport.assertJobStatusEventually(job, JobStatus.RUNNING);
-        HazelcastTestSupport.sleepAtLeastSeconds(10);
+        assertJobStatusEventually(job, JobStatus.RUNNING);
+        sleepAtLeastSeconds(10);
 
         job.restart();
-        JetTestSupport.assertJobStatusEventually(job, JobStatus.RUNNING);
+        assertJobStatusEventually(job, JobStatus.RUNNING);
 
         // update record
         mongo.execInContainer("sh", "-c", "/usr/local/bin/alterData.sh");
@@ -220,7 +215,7 @@ public class MongoDbIntegrationTest extends AbstractIntegrationTest {
                 .writeTo(assertCollectedEventually(30, assertListFn(expectedEvents)));
 
         Job job = jet.newJob(pipeline);
-        JetTestSupport.assertJobStatusEventually(job, JobStatus.RUNNING);
+        assertJobStatusEventually(job, JobStatus.RUNNING);
 
         try {
             job.join();

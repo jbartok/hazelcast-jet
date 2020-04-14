@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.hazelcast.jet.cdc.mongodb;
+package com.hazelcast.jet.cdc;
 
 import com.hazelcast.jet.annotation.EvolvingApi;
-import com.hazelcast.jet.cdc.ChangeEvent;
 import com.hazelcast.jet.cdc.impl.AbstractSourceBuilder;
 import com.hazelcast.jet.cdc.impl.PropertyRules;
+import com.hazelcast.jet.cdc.impl.ChangeEventMongoImpl;
 import com.hazelcast.jet.pipeline.StreamSource;
 import org.apache.kafka.connect.data.Values;
 

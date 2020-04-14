@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.hazelcast.jet.cdc.mongodb;
+package com.hazelcast.jet.cdc.impl;
 
 import com.hazelcast.jet.cdc.ChangeEventElement;
 import com.hazelcast.jet.cdc.ChangeEventValue;
@@ -23,7 +23,7 @@ import com.hazelcast.jet.cdc.ParsingException;
 
 import javax.annotation.Nonnull;
 
-import static com.hazelcast.jet.cdc.mongodb.MongoParsing.getChild;
+import static com.hazelcast.jet.cdc.impl.MongoParsing.getChild;
 
 public class ChangeEventValueMongoImpl extends ChangeEventElementMongoImpl implements ChangeEventValue {
 
