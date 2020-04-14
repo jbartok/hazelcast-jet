@@ -73,10 +73,4 @@ public class ChangeEventValueJsonImpl extends ChangeEventElementJsonImpl impleme
         }
         return after;
     }
-
-    @Override
-    @Nonnull
-    public ChangeEventElement change() {
-        throw new UnsupportedOperationException("Not supported for relational databases");
-    }
 }

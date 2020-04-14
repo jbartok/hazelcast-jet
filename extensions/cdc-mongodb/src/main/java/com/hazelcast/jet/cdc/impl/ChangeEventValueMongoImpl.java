@@ -77,7 +77,6 @@ public class ChangeEventValueMongoImpl extends ChangeEventElementMongoImpl imple
         return after;
     }
 
-    @Override
     @Nonnull
     public ChangeEventElement change() throws ParsingException {
         if (patch == null) {
