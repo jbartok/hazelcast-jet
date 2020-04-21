@@ -17,20 +17,30 @@
 package com.hazelcast.jet.cdc.impl;
 
 import com.hazelcast.jet.cdc.ChangeEvent;
-import com.hazelcast.jet.cdc.ChangeEventKey;
-import com.hazelcast.jet.cdc.ChangeEventValue;
+import com.hazelcast.jet.cdc.ChangeEventElement;
+import com.hazelcast.jet.cdc.Operation;
+import com.hazelcast.jet.cdc.ParsingException;
+import com.hazelcast.nio.ObjectDataInput;
+import com.hazelcast.nio.ObjectDataOutput;
+import com.hazelcast.nio.serialization.IdentifiedDataSerializable;
 
 import javax.annotation.Nonnull;
+import java.io.IOException;
 import java.util.Objects;
 
-public class ChangeEventJsonImpl implements ChangeEvent {
+public class ChangeEventJsonImpl implements ChangeEvent, IdentifiedDataSerializable {
 
-    private final String keyJson;
-    private final String valueJson;
+    private String keyJson;
+    private String valueJson;
 
     private String json;
-    private ChangeEventKey key;
-    private ChangeEventValue value;
+    private Long timestamp;
+    private Operation operation;
+    private ChangeEventElement key;
+    private ChangeEventElement value;
+
+    ChangeEventJsonImpl() { //needed for deserialization
+    }
 
     public ChangeEventJsonImpl(@Nonnull String keyJson, @Nonnull String valueJson) {
         this.keyJson = Objects.requireNonNull(keyJson, "keyJson");
@@ -38,19 +48,37 @@ public class ChangeEventJsonImpl implements ChangeEvent {
     }
 
     @Override
+    public long timestamp() throws ParsingException {
+        if (timestamp == null) {
+            timestamp = value().getLong("__ts_ms")
+                    .orElseThrow(() -> new ParsingException("No parsable timestamp field found"));
+        }
+        return timestamp;
+    }
+
+    @Override
     @Nonnull
-    public ChangeEventKey key() {
+    public Operation operation() throws ParsingException {
+        if (operation == null) {
+            operation = Operation.get(value().getString("__op").orElse(null));
+        }
+        return operation;
+    }
+
+    @Override
+    @Nonnull
+    public ChangeEventElement key() {
         if (key == null) {
-            key = new ChangeEventKeyJsonImpl(keyJson);
+            key = new ChangeEventElementJsonImpl(keyJson);
         }
         return key;
     }
 
     @Override
     @Nonnull
-    public ChangeEventValue value() {
+    public ChangeEventElement value() {
         if (value == null) {
-            value = new ChangeEventValueJsonImpl(valueJson);
+            value = new ChangeEventElementJsonImpl(valueJson);
         }
         return value;
     }
@@ -67,6 +95,28 @@ public class ChangeEventJsonImpl implements ChangeEvent {
     @Override
     public String toString() {
         return asJson();
+    }
+
+    @Override
+    public int getFactoryId() {
+        return CdcJsonDataSerializerHook.FACTORY_ID;
+    }
+
+    @Override
+    public int getClassId() {
+        return CdcJsonDataSerializerHook.EVENT;
+    }
+
+    @Override
+    public void writeData(ObjectDataOutput out) throws IOException {
+        out.writeUTF(keyJson);
+        out.writeUTF(valueJson);
+    }
+
+    @Override
+    public void readData(ObjectDataInput in) throws IOException {
+        keyJson = in.readUTF();
+        valueJson = in.readUTF();
     }
 
 }
