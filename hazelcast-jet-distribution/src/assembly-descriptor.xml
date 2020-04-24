@@ -43,6 +43,7 @@
                 <include>com.hazelcast.jet:hazelcast-jet-cdc-mysql</include>
                 <include>com.hazelcast.jet:hazelcast-jet-cdc-postgres</include>
                 <include>com.hazelcast.jet:hazelcast-jet-cdc-sqlserver</include>
+                <include>com.hazelcast.jet:hazelcast-jet-grpc</include>
                 <include>com.hazelcast.jet:hazelcast-jet-protobuf</include>
                 <include>com.hazelcast.jet:hazelcast-jet-spring</include>
                 <include>com.hazelcast.jet:hazelcast-jet-python</include>

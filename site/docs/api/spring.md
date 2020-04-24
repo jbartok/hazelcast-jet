@@ -187,9 +187,9 @@ Here’s how your namespace and schema instance declarations may look:
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans-2.5.xsd
         http://www.hazelcast.com/schema/spring
-        http://www.hazelcast.com/schema/spring/hazelcast-spring-4.0.xsd
+        http://www.hazelcast.com/schema/spring/hazelcast-spring-{imdg-version}.xsd
         http://www.hazelcast.com/schema/jet-spring
-        http://www.hazelcast.com/schema/jet-spring/hazelcast-jet-spring-4.0.xsd">
+        http://www.hazelcast.com/schema/jet-spring/hazelcast-jet-spring-{jet-version}.xsd">
         <!-- ... -->
  </beans>
 ```
@@ -258,9 +258,9 @@ beans:
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans-2.5.xsd
         http://www.hazelcast.com/schema/spring
-        http://www.hazelcast.com/schema/spring/hazelcast-spring-4.0.xsd
+        http://www.hazelcast.com/schema/spring/hazelcast-spring-{imdg-version}.xsd
         http://www.hazelcast.com/schema/jet-spring
-        http://www.hazelcast.com/schema/jet-spring/hazelcast-jet-spring-4.0.xsd">
+        http://www.hazelcast.com/schema/jet-spring/hazelcast-jet-spring-{jet-version}.xsd">
 
     <!-- Obtain Hazelcast IMDG instance from Hazelcast Jet instance-->
     <jet:hazelcast jet-instance-ref="jet-instance" id="hazelcast-instance"/>
@@ -319,7 +319,7 @@ attributes.
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans-2.5.xsd
         http://www.hazelcast.com/schema/jet-spring
-        http://www.hazelcast.com/schema/jet-spring/hazelcast-jet-spring-4.0.xsd">
+        http://www.hazelcast.com/schema/jet-spring/hazelcast-jet-spring-{jet-version}.xsd">
     <jet:instance id="instance" lazy-init="true" scope="singleton">
     <!-- ... -->
     </jet:instance>
@@ -328,3 +328,58 @@ attributes.
     </jet:client>
 </beans>
 ```
+
+## Spring Boot Integration
+
+Hazelcast Jet provides
+[Hazelcast Jet Spring Boot Starter](https://github.com/hazelcast/hazelcast-jet-contrib/tree/master/hazelcast-jet-spring-boot-starter)
+which automatically configures and starts a `JetInstance`, either a
+server or a client, if Jet is on the classpath.
+
+To create a server instance you need to put `hazelcast-jet.yaml` or
+`hazelcast-jet.xml` to the classpath or to the root directory. To
+create a client instance you need to put `hazelcast-client.yaml` or
+`hazelcast-client.xml` to the classpath or to the root directory.
+
+If your configuration files are available with different names then you
+can point to them by config properties, `hazelcast.jet.server.config`
+for server and `hazelcast.jet.client.config` for client. You can also
+use system properties, `hazelcast.jet.config` for server and
+`hazelcast.client.config` for client.
+
+If you want to configure the underlying `HazelcastInstance`, you need
+to put `hazelcast.yaml` or `hazelcast.xml` to the classpath or to the
+root directory. You can use the config property
+`hazelcast.jet.imdg.config` or system property
+`hazelcast.config` to explicitly set the configuration file.
+
+If no configuration file is present or explicitly specified, the
+starter creates a server instance using the default configuration file
+(`hazelcast-jet-default.yaml`).
+
+See [Spring Boot Starter](../tutorials/spring-boot.md) tutorial for
+examples.  
+
+### Conflict with Hazelcast IMDG Starter
+
+Spring Boot has out of the box support for Hazelcast IMDG starter. This
+creates a conflict when Hazelcast IMDG related configuration files
+(like `hazelcast.xml` or `hazelcast-client.xml`) are on the classpath
+or at the root directory. We have addressed this issue by disabling
+Hazelcast IMDG starter if Hazelcast Jet is present. See the
+[PR](https://github.com/spring-projects/spring-boot/pull/20729) on
+Spring Boot repository.
+
+As a workaround users can exclude the Hazelcast IMDG auto-configuration
+class like below:
+
+```java
+@SpringBootApplication(exclude = HazelcastAutoConfiguration.class)
+```
+
+### SpringAware Objects
+
+Hazelcast Jet Spring Boot Starter configures the created member
+instances with `SpringManagedContext` automatically. See
+[Enabling SpringAware Objects](#enabling-springaware-objects) for more
+information.

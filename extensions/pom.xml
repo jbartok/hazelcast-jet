@@ -39,6 +39,7 @@
         <module>cdc-mysql</module>
         <module>cdc-postgres</module>
         <module>cdc-sqlserver</module>
+        <module>grpc</module>
         <module>hadoop</module>
         <module>kafka</module>
         <module>protobuf</module>
