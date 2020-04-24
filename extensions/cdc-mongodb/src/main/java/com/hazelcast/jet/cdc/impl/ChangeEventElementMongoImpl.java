@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Optional;
 
-class ChangeEventElementMongoImpl implements ChangeEventElement {
+public class ChangeEventElementMongoImpl implements ChangeEventElement {
 
     private Document document;
     private String json;
@@ -57,7 +57,13 @@ class ChangeEventElementMongoImpl implements ChangeEventElement {
 
     @Override
     @Nonnull
-    public Optional<Object> getObject(String key) throws ParsingException {
+    public Optional<ChangeEventElement> getChild(String key) throws ParsingException {
+        return Optional.empty(); //todo
+    }
+
+    @Override
+    @Nonnull
+    public Optional<Object> getRaw(String key) throws ParsingException {
         return MongoParsing.getObject(document(), key);
     }
 

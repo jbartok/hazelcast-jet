@@ -18,7 +18,6 @@ package com.hazelcast.jet.cdc;
 
 import com.hazelcast.jet.JetInstance;
 import com.hazelcast.jet.Job;
-import com.hazelcast.jet.cdc.impl.ChangeEventValueMongoImpl;
 import com.hazelcast.jet.config.JobConfig;
 import com.hazelcast.jet.config.ProcessingGuarantee;
 import com.hazelcast.jet.core.JobStatus;
@@ -80,11 +79,11 @@ public class MongoDbIntegrationTest extends AbstractIntegrationTest {
                             switch (operation) {
                                 case SYNC:
                                 case INSERT:
-                                    state.set(event.value().after().mapToObj(Document.class));
+                                    state.set(event.value().mapToObj(Document.class));
                                     break;
                                 case UPDATE:
-                                    ChangeEventValueMongoImpl value = (ChangeEventValueMongoImpl) event.value();
-                                    state.update(value.change().mapToObj(Document.class));
+                                    ChangeEventElement value = event.value();
+                                    state.update(value.getChild("patch").get().mapToObj(Document.class));
                                     break;
                                 case DELETE:
                                     state.clear();
@@ -136,11 +135,11 @@ public class MongoDbIntegrationTest extends AbstractIntegrationTest {
                             switch (operation) {
                                 case SYNC:
                                 case INSERT:
-                                    state.set(event.value().after().mapToObj(Document.class));
+                                    state.set(event.value().mapToObj(Document.class));
                                     break;
                                 case UPDATE:
-                                    ChangeEventValueMongoImpl value = (ChangeEventValueMongoImpl) event.value();
-                                    state.update(value.change().mapToObj(Document.class));
+                                    ChangeEventElement value = event.value();
+                                    state.update(value.getChild("patch").get().mapToObj(Document.class));
                                     break;
                                 case DELETE:
                                     state.clear();
@@ -201,11 +200,11 @@ public class MongoDbIntegrationTest extends AbstractIntegrationTest {
                             switch (operation) {
                                 case SYNC:
                                 case INSERT:
-                                    state.set(event.value().after().mapToObj(Document.class));
+                                    state.set(event.value().mapToObj(Document.class));
                                     break;
                                 case UPDATE:
-                                    ChangeEventValueMongoImpl value = (ChangeEventValueMongoImpl) event.value();
-                                    state.update(value.change().mapToObj(Document.class));
+                                    ChangeEventElement value = event.value();
+                                    state.update(value.getChild("patch").get().mapToObj(Document.class));
                                     break;
                                 case DELETE:
                                     state.clear();

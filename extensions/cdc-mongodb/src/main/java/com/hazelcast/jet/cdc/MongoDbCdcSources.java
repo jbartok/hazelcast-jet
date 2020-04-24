@@ -19,9 +19,7 @@ package com.hazelcast.jet.cdc;
 import com.hazelcast.jet.annotation.EvolvingApi;
 import com.hazelcast.jet.cdc.impl.AbstractSourceBuilder;
 import com.hazelcast.jet.cdc.impl.PropertyRules;
-import com.hazelcast.jet.cdc.impl.ChangeEventMongoImpl;
 import com.hazelcast.jet.pipeline.StreamSource;
-import org.apache.kafka.connect.data.Values;
 
 /**
  * Contains factory methods for creating change data capture sources
@@ -211,14 +209,7 @@ public final class MongoDbCdcSources {
          */
         public StreamSource<ChangeEvent> build() {
             RULES.check(properties);
-            return connect(properties,
-                    ChangeEvent::timestamp,
-                    (record) -> {
-                        String keyJson = Values.convertToString(record.keySchema(), record.key());
-                        String valueJson = Values.convertToString(record.valueSchema(), record.value());
-                        return new ChangeEventMongoImpl(keyJson, valueJson);
-                    }
-            );
+            return connect(properties); //todo: not ok, needs to call mongo specific implementations
         }
     }
 }

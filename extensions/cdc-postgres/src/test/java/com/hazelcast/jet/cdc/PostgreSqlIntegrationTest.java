@@ -38,7 +38,6 @@ import java.sql.DriverManager;
 import java.util.Objects;
 import java.util.concurrent.CompletionException;
 
-import static com.hazelcast.jet.cdc.Operation.DELETE;
 import static com.hazelcast.jet.pipeline.test.AssertionSinks.assertCollectedEventually;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -75,11 +74,9 @@ public class PostgreSqlIntegrationTest extends AbstractIntegrationTest {
                         (accumulator, customerId, event) -> {
                             long count = accumulator.get();
                             accumulator.add(1);
-                            ChangeEventValue eventValue = event.value();
-                            Operation operation = eventValue.operation();
-                            ChangeEventElement mostRecentImage = DELETE.equals(operation) ?
-                                    eventValue.before() : eventValue.after();
-                            Customer customer = mostRecentImage.mapToObj(Customer.class);
+                            Operation operation = event.operation();
+                            ChangeEventElement eventValue = event.value();
+                            Customer customer = eventValue.mapToObj(Customer.class);
                             return customerId + "/" + count + ":" + operation + ":" + customer;
                         })
                 .setLocalParallelism(1)
@@ -137,11 +134,9 @@ public class PostgreSqlIntegrationTest extends AbstractIntegrationTest {
                         (accumulator, customerId, event) -> {
                             long count = accumulator.get();
                             accumulator.add(1);
-                            ChangeEventValue eventValue = event.value();
-                            Operation operation = eventValue.operation();
-                            ChangeEventElement mostRecentImage = DELETE.equals(operation) ?
-                                    eventValue.before() : eventValue.after();
-                            Customer customer = mostRecentImage.mapToObj(Customer.class);
+                            Operation operation = event.operation();
+                            ChangeEventElement eventValue = event.value();
+                            Customer customer = eventValue.mapToObj(Customer.class);
                             return customerId + "/" + count + ":" + operation + ":" + customer;
                         })
                 .setLocalParallelism(1)
