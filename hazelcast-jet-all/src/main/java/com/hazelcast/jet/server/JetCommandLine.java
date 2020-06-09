@@ -30,9 +30,11 @@ import com.hazelcast.jet.JetException;
 import com.hazelcast.jet.JetInstance;
 import com.hazelcast.jet.Job;
 import com.hazelcast.jet.JobStateSnapshot;
+import com.hazelcast.jet.Observable;
 import com.hazelcast.jet.Util;
 import com.hazelcast.jet.core.JobNotFoundException;
 import com.hazelcast.jet.core.JobStatus;
+import com.hazelcast.jet.function.Observer;
 import com.hazelcast.jet.impl.JetBootstrap;
 import com.hazelcast.jet.impl.JetClientInstanceImpl;
 import com.hazelcast.jet.impl.JobSummary;
@@ -215,6 +217,33 @@ public class JetCommandLine implements Runnable {
         }
         JetBootstrap.executeJar(this::getJetClient, file.getAbsolutePath(),
                 snapshotName, name, publishLogs, mainClass, params);
+    }
+
+    @Command(description = "Print logs of job")
+    public void log(
+            @Mixin(name = "verbosity") Verbosity verbosity,
+            @Parameters(index = "0",
+                    paramLabel = "<job name or id>",
+                    description = "Name of the job to view logs for"
+            ) String name
+    ) throws IOException {
+        runWithJet(verbosity, jet -> {
+            Job job = getJob(jet, name);
+            printf("Displaying logs for job %s:", formatJob(job));
+            Observable<String> observable = jet.getObservable(logsObservableName(job));
+            observable.addObserver(Observer.of(System.out::println));
+            while (true) {
+                try {
+                    TimeUnit.SECONDS.sleep(1);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+
+    private String logsObservableName(Job job) {
+        return "logs." + idToString(job.getId());
     }
 
     @Command(description = "Suspends a running job")
