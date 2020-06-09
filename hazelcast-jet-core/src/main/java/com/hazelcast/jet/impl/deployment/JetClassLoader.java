@@ -16,6 +16,7 @@
 
 package com.hazelcast.jet.impl.deployment;
 
+import com.hazelcast.cluster.Member;
 import com.hazelcast.internal.nio.IOUtil;
 import com.hazelcast.jet.config.JobConfig;
 import com.hazelcast.jet.impl.JobRepository;
@@ -50,6 +51,7 @@ public class JetClassLoader extends ClassLoader {
     private final String jobName;
     private final Supplier<IMap<String, byte[]>> resourcesSupplier;
     private final ILogger logger;
+    private final Member member;
     private final JobResourceURLStreamHandler jobResourceURLStreamHandler;
 
     private volatile boolean isShutdown;
@@ -66,7 +68,16 @@ public class JetClassLoader extends ClassLoader {
         this.jobId = jobId;
         this.resourcesSupplier = Util.memoizeConcurrent(() -> jobRepository.getJobResources(jobId));
         this.logger = nodeEngine.getLogger(getClass());
+        this.member = nodeEngine.getLocalMember();
         this.jobResourceURLStreamHandler = new JobResourceURLStreamHandler();
+    }
+
+    public long getJobId() {
+        return jobId;
+    }
+
+    public Member getMember() {
+        return member;
     }
 
     @Override

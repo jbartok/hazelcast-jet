@@ -53,7 +53,10 @@ public class HelloWorld {
                 .withIngestionTimestamps()
                 .window(WindowDefinition.tumbling(1000))
                 .aggregate(AggregateOperations.topN(TOP, ComparatorEx.comparingLong(l -> l)))
-                .map(WindowResult::result);
+                .map(WindowResult::result)
+//                .map(Library::doSomethingAndLog)
+                ;
+
         stage.writeTo(Sinks.observable(RESULTS));
         stage.writeTo(Sinks.logger());
         return p;
@@ -73,6 +76,7 @@ public class HelloWorld {
 
         JobConfig config = new JobConfig();
         config.setName("hello-world");
+        config.setPublishLogs(true);
         config.setProcessingGuarantee(ProcessingGuarantee.EXACTLY_ONCE);
         jet.newJobIfAbsent(p, config).join();
     }

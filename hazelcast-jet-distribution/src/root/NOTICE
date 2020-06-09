@@ -83,7 +83,6 @@ Apache License, Version 2.0
   Apache Kafka:2.2.0
   Apache Log4j API:2.12.1
   Apache Log4j Core:2.12.1
-  Apache Log4j SLF4J Binding:2.12.1
   Lucene Common Analyzers:8.0.0
   Lucene Memory:8.0.0
   Lucene Core:8.0.0
@@ -152,7 +151,7 @@ MIT License
   JOpt Simple:5.0.2
   Checker Qual:2.5.5
   Animal Sniffer Annotations:1.18
-  SLF4J API Module:1.7.25
+  SLF4J API Module:1.7.30
 Public Domain
   XZ for Java:1.5
 Public Domain, per Creative Commons CC0

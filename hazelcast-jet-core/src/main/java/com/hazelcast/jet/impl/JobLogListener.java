@@ -18,9 +18,11 @@ package com.hazelcast.jet.impl;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.jet.Util;
+import com.hazelcast.jet.slf4j.HazelcastJetJobLoggerFactory;
 import com.hazelcast.logging.LogEvent;
 import com.hazelcast.logging.LogListener;
 import com.hazelcast.ringbuffer.Ringbuffer;
+import org.slf4j.impl.StaticLoggerBinder;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,8 +37,13 @@ public class JobLogListener implements LogListener {
     }
 
     public void addJobId(long jobId) {
-        buffers.computeIfAbsent(Util.idToString(jobId),
+        String jobIdString = Util.idToString(jobId);
+        Ringbuffer<String> ringbuffer = buffers.computeIfAbsent(jobIdString,
                 id -> instance.getRingbuffer(JobLogUtil.ringbufferName(id)));
+
+        // It's 16:25 already
+        ((HazelcastJetJobLoggerFactory) StaticLoggerBinder.getSingleton().getLoggerFactory())
+                .getBuffers().put(jobIdString, ringbuffer);
     }
 
     @Override
