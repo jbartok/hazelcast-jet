@@ -1,7 +1,24 @@
+/*
+ * Copyright (c) 2008-2020, Hazelcast, Inc. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.hazelcast.jet.impl;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.instance.SimpleMemberImpl;
+import com.hazelcast.internal.util.UuidUtil;
 import com.hazelcast.jet.Util;
 import com.hazelcast.logging.LogEvent;
 import com.hazelcast.ringbuffer.OverflowPolicy;
@@ -14,7 +31,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.net.InetSocketAddress;
-import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 
@@ -75,7 +91,7 @@ public class JobLogListenerTest {
         LogRecord record = new LogRecord(Level.INFO, msg);
         return new LogEvent(record,
                 new SimpleMemberImpl(new MemberVersion(4, 1, 1),
-                        UUID.randomUUID(),
+                        UuidUtil.newUnsecureUUID(),
                         new InetSocketAddress("127.0.0.1", 5701)));
     }
 }

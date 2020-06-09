@@ -29,6 +29,7 @@ import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.core.ProcessorSupplier;
 import com.hazelcast.jet.core.TopologyChangedException;
 import com.hazelcast.jet.core.Vertex;
+import com.hazelcast.jet.impl.JobLogger;
 import com.hazelcast.jet.impl.execution.init.Contexts.MetaSupplierCtx;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.spi.impl.NodeEngine;
@@ -83,8 +84,11 @@ public final class ExecutionPlanBuilder {
                     e -> vertexIdMap.get(e.getSourceName()), isJobDistributed);
             final List<EdgeDef> outbound = toEdgeDefs(dag.getOutboundEdges(vertex.getName()), defaultEdgeConfig,
                     e -> vertexIdMap.get(e.getDestName()), isJobDistributed);
-            final ILogger logger = nodeEngine.getLogger(String.format("%s.%s#ProcessorMetaSupplier",
-                    metaSupplier.getClass().getName(), vertex.getName()));
+            final ILogger logger = new JobLogger(
+                    nodeEngine.getLocalMember(),
+                    nodeEngine.getLogger(String.format("%s.%s#ProcessorMetaSupplier",
+                            metaSupplier.getClass().getName(), vertex.getName())),
+                    jobId, instance);
             try {
                 metaSupplier.init(new MetaSupplierCtx(instance, jobId, executionId, jobConfig, logger,
                         vertex.getName(), localParallelism, totalParallelism, clusterSize,

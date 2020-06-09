@@ -27,6 +27,7 @@ import com.hazelcast.jet.datamodel.WindowResult;
 import com.hazelcast.jet.function.Observer;
 import com.hazelcast.jet.pipeline.Pipeline;
 import com.hazelcast.jet.pipeline.Sinks;
+import com.hazelcast.jet.pipeline.StreamStage;
 import com.hazelcast.jet.pipeline.WindowDefinition;
 import com.hazelcast.jet.pipeline.test.TestSources;
 
@@ -48,12 +49,13 @@ public class HelloWorld {
 
     private static Pipeline buildPipeline() {
         Pipeline p = Pipeline.create();
-        p.readFrom(TestSources.itemStream(100, (ts, seq) -> nextRandomNumber()))
+        StreamStage<List<Long>> stage = p.readFrom(TestSources.itemStream(100, (ts, seq) -> nextRandomNumber()))
                 .withIngestionTimestamps()
                 .window(WindowDefinition.tumbling(1000))
                 .aggregate(AggregateOperations.topN(TOP, ComparatorEx.comparingLong(l -> l)))
-                .map(WindowResult::result)
-                .writeTo(Sinks.observable(RESULTS));
+                .map(WindowResult::result);
+        stage.writeTo(Sinks.observable(RESULTS));
+        stage.writeTo(Sinks.logger());
         return p;
     }
 

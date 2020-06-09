@@ -1,64 +1,57 @@
+/*
+ * Copyright (c) 2008-2020, Hazelcast, Inc. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.hazelcast.jet.impl;
 
-import com.hazelcast.cluster.Address;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.jet.Util;
-import com.hazelcast.jet.impl.observer.ObservableImpl;
-import com.hazelcast.logging.ILogger;
 import com.hazelcast.logging.LogEvent;
 import com.hazelcast.logging.LogListener;
-import com.hazelcast.logging.Logger;
-import com.hazelcast.ringbuffer.OverflowPolicy;
 import com.hazelcast.ringbuffer.Ringbuffer;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static com.hazelcast.jet.impl.util.Util.toLocalTime;
-
 public class JobLogListener implements LogListener {
 
-    private static final ILogger logger = Logger.getLogger(JobLogListener.class);
-
     private final HazelcastInstance instance;
-    private final Map<String, Ringbuffer<String>> jobIds = new ConcurrentHashMap<>();
+    private final Map<String, Ringbuffer<String>> buffers = new ConcurrentHashMap<>();
 
     public JobLogListener(HazelcastInstance instance) {
         this.instance = instance;
     }
 
     public void addJobId(long jobId) {
-        String stringJobId = Util.idToString(jobId);
-        logger.info("Register logger for jobId=" + stringJobId);
-        jobIds.computeIfAbsent(stringJobId, missingJobId ->
-                instance.getRingbuffer(ObservableImpl.JET_OBSERVABLE_NAME_PREFIX + "logs." + stringJobId));
+        buffers.computeIfAbsent(Util.idToString(jobId),
+                id -> instance.getRingbuffer(JobLogUtil.ringbufferName(id)));
     }
 
     public void removeJobId(long jobId) {
-        String stringJobId = Util.idToString(jobId);
-        jobIds.remove(stringJobId);
-        logger.info("Deregister logger for jobId=" + stringJobId);
+        buffers.remove(Util.idToString(jobId));
     }
 
     @Override
     public void log(LogEvent logEvent) {
-        for (String jobId : jobIds.keySet()) {
-            if (logEvent.getLogRecord().getMessage().contains(jobId)) {
-                Ringbuffer<String> ringbuffer = jobIds.get(jobId);
-                if (ringbuffer != null) {
-                    ringbuffer.addAsync(format(logEvent), OverflowPolicy.OVERWRITE);
-                } else {
-                    logger.warning("Null logging ringbuffer for jobId=" + jobId);
-                    new Throwable().printStackTrace(); // just for discovering stuff quickly :-)
-                }
+        for (Map.Entry<String, Ringbuffer<String>> entry : buffers.entrySet()) {
+            String jobId = entry.getKey();
+            boolean needsToBeLogged = logEvent.getLogRecord().getMessage().contains(jobId);
+            if (needsToBeLogged) {
+                JobLogUtil.addToRingbuffer(entry.getValue(), JobLogUtil.format(logEvent));
             }
         }
     }
 
-    private String format(LogEvent event) {
-        Address member = event.getMember().getAddress();
-        String timestamp = toLocalTime(event.getLogRecord().getMillis());
-        String message = event.getLogRecord().getMessage();
-        return member + "@" + timestamp + " - " + message;
-    }
 }

@@ -20,6 +20,7 @@ import com.hazelcast.function.FunctionEx;
 import com.hazelcast.jet.core.AbstractProcessor;
 import com.hazelcast.jet.core.Watermark;
 import com.hazelcast.jet.core.processor.DiagnosticProcessors;
+import com.hazelcast.logging.ILogger;
 
 import javax.annotation.Nonnull;
 import java.util.function.Function;
@@ -43,7 +44,8 @@ public class WriteLoggerP<T> extends AbstractProcessor {
     @Override
     @SuppressWarnings("unchecked")
     protected boolean tryProcess(int ordinal, @Nonnull Object item) {
-        getLogger().info(toStringFn.apply((T) item).toString());
+        ILogger logger = getLogger();
+        logger.info(toStringFn.apply((T) item).toString());
         return true;
     }
 

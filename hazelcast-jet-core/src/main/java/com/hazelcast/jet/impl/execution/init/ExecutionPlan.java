@@ -32,6 +32,7 @@ import com.hazelcast.jet.core.Edge.RoutingPolicy;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorSupplier;
 import com.hazelcast.jet.impl.JetService;
+import com.hazelcast.jet.impl.JobLogger;
 import com.hazelcast.jet.impl.execution.ConcurrentInboundEdgeStream;
 import com.hazelcast.jet.impl.execution.ConveyorCollector;
 import com.hazelcast.jet.impl.execution.ConveyorCollectorWithPartition;
@@ -179,12 +180,16 @@ public class ExecutionPlan implements IdentifiedDataSerializable {
                         vertex.name(),
                         globalProcessorIndex
                 );
+                ILogger logger = new JobLogger(
+                        nodeEngine.getLocalMember(),
+                        nodeEngine.getLogger(loggerName),
+                        jobId, instance);
                 ProcCtx context = new ProcCtx(
                         instance,
                         jobId,
                         executionId,
                         getJobConfig(),
-                        nodeEngine.getLogger(loggerName),
+                        logger,
                         vertex.name(),
                         localProcessorIdx,
                         globalProcessorIndex,
@@ -308,8 +313,10 @@ public class ExecutionPlan implements IdentifiedDataSerializable {
 
         for (VertexDef vertex : vertices) {
             ProcessorSupplier supplier = vertex.processorSupplier();
-            ILogger logger = nodeEngine.getLogger(supplier.getClass().getName() + '.'
-                    + vertex.name() + "#ProcessorSupplier");
+            ILogger logger = new JobLogger(
+                    nodeEngine.getLocalMember(),
+                    nodeEngine.getLogger(supplier.getClass().getName() + '.' + vertex.name() + "#ProcessorSupplier"),
+                    jobId, service.getJetInstance());
             try {
                 supplier.init(new ProcSupplierCtx(
                         service.getJetInstance(),

@@ -21,6 +21,7 @@ import com.hazelcast.jet.core.Inbox;
 import com.hazelcast.jet.core.Outbox;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.Watermark;
+import com.hazelcast.jet.impl.JobLogger;
 import com.hazelcast.jet.impl.execution.init.Contexts.ProcCtx;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.spi.impl.NodeEngine;
@@ -66,12 +67,16 @@ public abstract class ProcessorWrapper implements Processor {
         if (context instanceof ProcCtx) {
             ProcCtx c = (ProcCtx) context;
             NodeEngine nodeEngine = ((HazelcastInstanceImpl) c.jetInstance().getHazelcastInstance()).node.nodeEngine;
-            ILogger newLogger = nodeEngine.getLogger(
+            ILogger newLogger = new JobLogger(
+                    nodeEngine.getLocalMember(),
+                    nodeEngine.getLogger(
                     createLoggerName(
                             getWrapped().getClass().getName(),
                             c.jobConfig().getName(),
                             c.vertexName(),
-                            c.globalProcessorIndex())
+                            c.globalProcessorIndex())),
+                    c.jobId(),
+                    c.jetInstance()
             );
             context = new ProcCtx(c.jetInstance(), c.jobId(), c.executionId(), c.jobConfig(),
                     newLogger, c.vertexName(), c.localProcessorIndex(), c.globalProcessorIndex(), c.processingGuarantee(),
