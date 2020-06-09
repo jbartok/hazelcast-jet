@@ -16,25 +16,6 @@
 
 package com.hazelcast.jet.config;
 
-import static com.hazelcast.internal.util.Preconditions.checkNotNull;
-import static com.hazelcast.jet.config.ResourceType.CLASS;
-import static java.util.concurrent.TimeUnit.SECONDS;
-
-import java.io.File;
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.file.Files;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Objects;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-
 import com.hazelcast.config.MetricsConfig;
 import com.hazelcast.internal.util.Preconditions;
 import com.hazelcast.jet.JetException;
@@ -52,6 +33,24 @@ import com.hazelcast.nio.serialization.IdentifiedDataSerializable;
 import com.hazelcast.nio.serialization.StreamSerializer;
 import com.hazelcast.spi.annotation.PrivateApi;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.io.File;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Objects;
+
+import static com.hazelcast.internal.util.Preconditions.checkNotNull;
+import static com.hazelcast.jet.config.ResourceType.CLASS;
+import static java.util.concurrent.TimeUnit.SECONDS;
+
 /**
  * Contains the configuration specific to one Hazelcast Jet job.
  *
@@ -68,6 +67,7 @@ public class JobConfig implements IdentifiedDataSerializable {
     private boolean splitBrainProtectionEnabled;
     private boolean enableMetrics = true;
     private boolean storeMetricsAfterJobCompletion;
+    private boolean publishLogs;
 
     private Map<String, ResourceConfig> resourceConfigs = new LinkedHashMap<>();
     private Map<String, String> serializerConfigs = new HashMap<>();
@@ -1081,6 +1081,21 @@ public class JobConfig implements IdentifiedDataSerializable {
         return this;
     }
 
+    /**
+     * Specifies if logs for this job are published or not.
+     */
+    public boolean isPublishLogs() {
+        return publishLogs;
+    }
+
+    /**
+     * Sets weather logs for this job should be published or not.
+     */
+    public JobConfig setPublishLogs(boolean publishLogs) {
+        this.publishLogs = publishLogs;
+        return this;
+    }
+
     @Override
     public int getFactoryId() {
         return JetConfigDataSerializerHook.FACTORY_ID;
@@ -1104,6 +1119,7 @@ public class JobConfig implements IdentifiedDataSerializable {
         out.writeUTF(initialSnapshotName);
         out.writeBoolean(enableMetrics);
         out.writeBoolean(storeMetricsAfterJobCompletion);
+        out.writeBoolean(publishLogs);
     }
 
     @Override
@@ -1119,6 +1135,7 @@ public class JobConfig implements IdentifiedDataSerializable {
         initialSnapshotName = in.readUTF();
         enableMetrics = in.readBoolean();
         storeMetricsAfterJobCompletion = in.readBoolean();
+        publishLogs = in.readBoolean();
     }
 
     @Override
@@ -1134,6 +1151,7 @@ public class JobConfig implements IdentifiedDataSerializable {
                 && splitBrainProtectionEnabled == jobConfig.splitBrainProtectionEnabled
                 && enableMetrics == jobConfig.enableMetrics
                 && storeMetricsAfterJobCompletion == jobConfig.storeMetricsAfterJobCompletion
+                && publishLogs == jobConfig.publishLogs
                 && Objects.equals(name, jobConfig.name) && processingGuarantee == jobConfig.processingGuarantee
                 && Objects.equals(resourceConfigs, jobConfig.resourceConfigs)
                 && Objects.equals(serializerConfigs, jobConfig.serializerConfigs)
@@ -1144,8 +1162,8 @@ public class JobConfig implements IdentifiedDataSerializable {
     @Override
     public int hashCode() {
         return Objects.hash(name, processingGuarantee, snapshotIntervalMillis, autoScaling, splitBrainProtectionEnabled,
-                enableMetrics, storeMetricsAfterJobCompletion, resourceConfigs, serializerConfigs, classLoaderFactory,
-                initialSnapshotName);
+                enableMetrics, storeMetricsAfterJobCompletion, publishLogs, resourceConfigs, serializerConfigs,
+                classLoaderFactory, initialSnapshotName);
     }
 
     @Override
@@ -1153,9 +1171,9 @@ public class JobConfig implements IdentifiedDataSerializable {
         return "JobConfig {name=" + name + ", processingGuarantee=" + processingGuarantee + ", snapshotIntervalMillis="
                 + snapshotIntervalMillis + ", autoScaling=" + autoScaling + ", splitBrainProtectionEnabled="
                 + splitBrainProtectionEnabled + ", enableMetrics=" + enableMetrics + ", storeMetricsAfterJobCompletion="
-                + storeMetricsAfterJobCompletion + ", resourceConfigs=" + resourceConfigs + ", serializerConfigs="
-                + serializerConfigs + ", classLoaderFactory=" + classLoaderFactory + ", initialSnapshotName="
-                + initialSnapshotName + "}";
+                + storeMetricsAfterJobCompletion + ", publishLogs=" + publishLogs + ", resourceConfigs=" + resourceConfigs
+                + ", serializerConfigs=" + serializerConfigs + ", classLoaderFactory=" + classLoaderFactory +
+                ", initialSnapshotName=" + initialSnapshotName + "}";
     }
 
 }

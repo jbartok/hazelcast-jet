@@ -182,6 +182,10 @@ public class JetCommandLine implements Runnable {
                     paramLabel = "<class>",
                     description = "Fully qualified name of the main class inside the JAR file"
             ) String mainClass,
+            @Option(names = {"-l", "--publish-logs"},
+                    paramLabel = "<publish logs>",
+                    description = "If logs should be published for this specific job"
+            ) boolean publishLogs,
             @Parameters(index = "0",
                     paramLabel = "<jar file>",
                     description = "The jar file to submit"
@@ -203,10 +207,14 @@ public class JetCommandLine implements Runnable {
         if (name != null) {
             printf("Using job name '%s'", name);
         }
+        if (publishLogs) {
+            printf("Logs will be published for job");
+        }
         if (snapshotName != null) {
             printf("Will restore the job from the snapshot with name '%s'", snapshotName);
         }
-        JetBootstrap.executeJar(this::getJetClient, file.getAbsolutePath(), snapshotName, name, mainClass, params);
+        JetBootstrap.executeJar(this::getJetClient, file.getAbsolutePath(),
+                snapshotName, name, publishLogs, mainClass, params);
     }
 
     @Command(description = "Suspends a running job")

@@ -82,9 +82,14 @@ public final class JetBootstrap {
     private JetBootstrap() {
     }
 
-    public static synchronized void executeJar(@Nonnull Supplier<JetInstance> supplier,
-                           @Nonnull String jar, @Nullable String snapshotName,
-                           @Nullable String jobName, @Nullable String mainClass, @Nonnull List<String> args
+    public static synchronized void executeJar(
+            @Nonnull Supplier<JetInstance> supplier,
+            @Nonnull String jar,
+            @Nullable String snapshotName,
+            @Nullable String jobName,
+            boolean publishLogs,
+            @Nullable String mainClass,
+            @Nonnull List<String> args
     ) throws Exception {
         if (JetBootstrap.supplier != null) {
             throw new IllegalStateException("Supplier was already set. This method should not be called outside " +
@@ -92,7 +97,7 @@ public final class JetBootstrap {
         }
 
         JetBootstrap.supplier = new ConcurrentMemoizingSupplier<>(() ->
-                new InstanceProxy(supplier.get(), jar, snapshotName, jobName)
+                new InstanceProxy(supplier.get(), jar, snapshotName, jobName, publishLogs)
         );
 
         try (JarFile jarFile = new JarFile(jar)) {
@@ -213,16 +218,18 @@ public final class JetBootstrap {
         private final String jar;
         private final String snapshotName;
         private final String jobName;
+        private final boolean publishLogs;
 
         InstanceProxy(JetInstance hazelcastInstance) {
-            this(hazelcastInstance, null, null, null);
+            this(hazelcastInstance, null, null, null, false);
         }
 
         InstanceProxy(
                 JetInstance instance,
                 @Nullable String jar,
                 @Nullable String snapshotName,
-                @Nullable String jobName
+                @Nullable String jobName,
+                boolean publishLogs
         ) {
             super(instance.getHazelcastInstance());
 
@@ -230,6 +237,7 @@ public final class JetBootstrap {
             this.jar = jar;
             this.snapshotName = snapshotName;
             this.jobName = jobName;
+            this.publishLogs = publishLogs;
         }
 
         @Nonnull @Override
@@ -271,6 +279,9 @@ public final class JetBootstrap {
             }
             if (jobName != null) {
                 config.setName(jobName);
+            }
+            if (publishLogs) {
+                config.setPublishLogs(true);
             }
             return config;
         }
