@@ -128,7 +128,7 @@ public class ExecutionContext implements DynamicMetricsProvider {
         // Must be populated early, so all processor suppliers are
         // available to be completed in the case of init failure
         procSuppliers = unmodifiableList(plan.getProcessorSuppliers());
-        snapshotContext = new SnapshotContext(nodeEngine.getLogger(SnapshotContext.class), jobNameAndExecutionId(),
+        snapshotContext = new SnapshotContext(nodeEngine.getLogger(SnapshotContext.class), jobNameIdAndExecutionId(),
                 plan.lastSnapshotId(), jobConfig.getProcessingGuarantee());
 
         JetService jetService = nodeEngine.getService(JetService.SERVICE_NAME);
@@ -192,7 +192,7 @@ public class ExecutionContext implements DynamicMetricsProvider {
             try {
                 tasklet.close();
             } catch (Throwable e) {
-                logger.severe(jobNameAndExecutionId()
+                logger.severe(jobNameIdAndExecutionId()
                         + " encountered an exception in Processor.close(), ignoring it", e);
             }
         }
@@ -201,7 +201,7 @@ public class ExecutionContext implements DynamicMetricsProvider {
             try {
                 s.close(error);
             } catch (Throwable e) {
-                logger.severe(jobNameAndExecutionId()
+                logger.severe(jobNameIdAndExecutionId()
                         + " encountered an exception in ProcessorSupplier.close(), ignoring it", e);
             }
         }
@@ -247,14 +247,15 @@ public class ExecutionContext implements DynamicMetricsProvider {
      * Starts the phase 1 of a new snapshot.
      */
     public CompletableFuture<SnapshotPhase1Result> beginSnapshotPhase1(long snapshotId, String mapName, int flags) {
-        LoggingUtil.logFine(logger, "Starting snapshot %d phase 1 for %s on member", snapshotId, jobNameAndExecutionId());
+        LoggingUtil.logFine(logger, "Starting snapshot %d phase 1 for %s on member",
+                snapshotId, jobNameIdAndExecutionId());
         synchronized (executionLock) {
             if (cancellationFuture.isDone()) {
                 throw new CancellationException();
             } else if (executionFuture != null && executionFuture.isDone()) {
                 // if execution is done, there are 0 processors to take snapshot of. Therefore we're done now.
                 LoggingUtil.logFine(logger, "Ignoring snapshot %d phase 1 for %s: execution completed",
-                        snapshotId, jobNameAndExecutionId());
+                        snapshotId, jobNameIdAndExecutionId());
                 return CompletableFuture.completedFuture(new SnapshotPhase1Result(0, 0, 0, null));
             }
             return snapshotContext.startNewSnapshotPhase1(snapshotId, mapName, flags);
@@ -265,14 +266,15 @@ public class ExecutionContext implements DynamicMetricsProvider {
      * Starts the phase 2 of the current snapshot.
      */
     public CompletableFuture<Void> beginSnapshotPhase2(long snapshotId, boolean success) {
-        LoggingUtil.logFine(logger, "Starting snapshot %d phase 2 for %s on member", snapshotId, jobNameAndExecutionId());
+        LoggingUtil.logFine(logger, "Starting snapshot %d phase 2 for %s on member",
+                snapshotId, jobNameIdAndExecutionId());
         synchronized (executionLock) {
             if (cancellationFuture.isDone()) {
                 throw new CancellationException();
             } else if (executionFuture != null && executionFuture.isDone()) {
                 // if execution is done, there are 0 processors to take snapshot of. Therefore we're done now.
                 LoggingUtil.logFine(logger, "Ignoring snapshot %d phase 2 for %s: execution completed",
-                        snapshotId, jobNameAndExecutionId());
+                        snapshotId, jobNameIdAndExecutionId());
                 return CompletableFuture.completedFuture(null);
             }
             return snapshotContext.startNewSnapshotPhase2(snapshotId, success);
@@ -298,8 +300,8 @@ public class ExecutionContext implements DynamicMetricsProvider {
         return executionId;
     }
 
-    public String jobNameAndExecutionId() {
-        return Util.jobNameAndExecutionId(jobName, executionId);
+    public String jobNameIdAndExecutionId() {
+        return Util.jobNameIdAndExecutionId(jobName, jobId, executionId);
     }
 
     public Address coordinator() {

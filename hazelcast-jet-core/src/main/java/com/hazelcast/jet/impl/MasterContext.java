@@ -45,7 +45,7 @@ import static com.hazelcast.jet.Util.idToString;
 import static com.hazelcast.jet.core.JobStatus.NOT_RUNNING;
 import static com.hazelcast.jet.core.JobStatus.SUSPENDED;
 import static com.hazelcast.jet.impl.util.ExceptionUtil.peel;
-import static com.hazelcast.jet.impl.util.Util.jobNameAndExecutionId;
+import static com.hazelcast.jet.impl.util.Util.jobNameIdAndExecutionId;
 
 /**
  * Data pertaining to single job on master member. There's one instance per job,
@@ -164,7 +164,7 @@ public class MasterContext {
     }
 
     String jobIdString() {
-        return jobNameAndExecutionId(jobName, executionId);
+        return jobNameIdAndExecutionId(jobName, jobId, executionId);
     }
 
     public JetService getJetService() {

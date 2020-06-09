@@ -67,10 +67,10 @@ public class SnapshotPhase1Operation extends AsyncJobOperation {
                     if (result.getError() == null) {
                         logFine(getLogger(),
                                 "Snapshot %s phase 1 for %s finished successfully on member",
-                                snapshotId, ctx.jobNameAndExecutionId());
+                                snapshotId, ctx.jobNameIdAndExecutionId());
                     } else {
                         getLogger().warning(String.format("Snapshot %d phase 1 for %s finished with an error on member: " +
-                                        "%s", snapshotId, ctx.jobNameAndExecutionId(), result.getError()));
+                                        "%s", snapshotId, ctx.jobNameIdAndExecutionId(), result.getError()));
                     }
                     return result;
                 });

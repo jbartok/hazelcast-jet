@@ -277,8 +277,8 @@ public final class Util {
         }
     }
 
-    public static String jobNameAndExecutionId(String jobName, long executionId) {
-        return "job '" + jobName + "', execution " + idToString(executionId);
+    public static String jobNameIdAndExecutionId(String jobName, long jobId, long executionId) {
+        return "job '" + jobName + "' (jobId='" + idToString(jobId) + "'), execution " + idToString(executionId);
     }
 
     public static String jobIdAndExecutionId(long jobId, long executionId) {

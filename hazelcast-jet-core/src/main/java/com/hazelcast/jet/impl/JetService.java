@@ -38,6 +38,7 @@ import com.hazelcast.jet.impl.metrics.JobMetricsPublisher;
 import com.hazelcast.jet.impl.operation.NotifyMemberShutdownOperation;
 import com.hazelcast.jet.impl.util.ExceptionUtil;
 import com.hazelcast.logging.ILogger;
+import com.hazelcast.logging.LoggingService;
 import com.hazelcast.spi.impl.NodeEngine;
 import com.hazelcast.spi.impl.NodeEngineImpl;
 import com.hazelcast.spi.impl.operationservice.LiveOperations;
@@ -51,6 +52,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import java.util.logging.Level;
 
 import static com.hazelcast.jet.core.JetProperties.JET_SHUTDOWNHOOK_ENABLED;
 import static com.hazelcast.jet.impl.util.ExceptionUtil.sneakyThrow;
@@ -79,6 +81,7 @@ public class JetService implements ManagedService, MembershipAwareService, LiveO
     private JobRepository jobRepository;
     private JobCoordinationService jobCoordinationService;
     private JobExecutionService jobExecutionService;
+    private JobLogListener jobLogListener;
 
     private final AtomicInteger numConcurrentAsyncOps = new AtomicInteger();
 
@@ -120,6 +123,10 @@ public class JetService implements ManagedService, MembershipAwareService, LiveO
 
         logger.info("Setting number of cooperative threads and default parallelism to "
                 + config.getInstanceConfig().getCooperativeThreadCount());
+
+        jobLogListener = new JobLogListener(jetInstance.getHazelcastInstance());
+        LoggingService loggingService = nodeEngine.getLoggingService();
+        loggingService.addLogListener(Level.ALL, jobLogListener);
     }
 
     static JetConfig findJetServiceConfig(Config hzConfig) {
@@ -215,6 +222,10 @@ public class JetService implements ManagedService, MembershipAwareService, LiveO
 
     public JobExecutionService getJobExecutionService() {
         return jobExecutionService;
+    }
+
+    public JobLogListener getJobLogListener() {
+        return jobLogListener;
     }
 
     /**

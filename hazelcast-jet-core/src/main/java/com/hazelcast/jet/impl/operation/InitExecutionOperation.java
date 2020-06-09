@@ -67,9 +67,12 @@ public class InitExecutionOperation extends AbstractJobOperation {
         JetService service = getService();
 
         Address caller = getCallerAddress();
+        ExecutionPlan plan = deserializePlan(serializedPlan);
+        if (plan.getJobConfig().isPublishLogs()) {
+            service.getJobLogListener().addJobId(jobId());
+        }
         logger.fine("Initializing execution plan for " + jobIdAndExecutionId(jobId(), executionId) + " from " + caller);
 
-        ExecutionPlan plan = deserializePlan(serializedPlan);
         service.getJobExecutionService().initExecution(jobId(), executionId, caller,
                 coordinatorMemberListVersion, participants, plan);
     }

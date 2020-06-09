@@ -46,7 +46,6 @@ import com.hazelcast.jet.impl.observer.WrappedThrowable;
 import com.hazelcast.jet.impl.operation.NotifyMemberShutdownOperation;
 import com.hazelcast.jet.impl.util.LoggingUtil;
 import com.hazelcast.logging.ILogger;
-import com.hazelcast.logging.LoggingService;
 import com.hazelcast.ringbuffer.OverflowPolicy;
 import com.hazelcast.ringbuffer.Ringbuffer;
 import com.hazelcast.spi.exception.RetryableHazelcastException;
@@ -77,7 +76,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -151,7 +149,6 @@ public class JobCoordinationService {
     private final Counter jobCompletedWithFailure = MwCounter.newMwCounter();
 
     private long maxJobScanPeriodInMillis;
-    private final JobLogListener jobLogListener;
 
     JobCoordinationService(
             NodeEngineImpl nodeEngine, JetService jetService, JetConfig config, JobRepository jobRepository
@@ -170,10 +167,6 @@ public class JobCoordinationService {
         MetricDescriptor descriptor = registry.newMetricDescriptor()
                 .withTag(MetricTags.MODULE, "jet");
         registry.registerStaticMetrics(descriptor, this);
-
-        jobLogListener = new JobLogListener(jetService.getJetInstance().getHazelcastInstance());
-        LoggingService loggingService = nodeEngine.getLoggingService();
-        loggingService.addLogListener(Level.ALL, jobLogListener);
     }
 
     public JobRepository jobRepository() {
@@ -194,7 +187,7 @@ public class JobCoordinationService {
             try {
                 JobConfig config = nodeEngine.getSerializationService().toObject(serializedConfig);
                 if (config.isPublishLogs()) {
-                    jobLogListener.addJobId(jobId);
+                    jetService.getJobLogListener().addJobId(jobId);
                 }
                 assertIsMaster("Cannot submit job " + idToString(jobId) + " to non-master node");
                 checkOperationalState();
@@ -697,8 +690,6 @@ public class JobCoordinationService {
                     logger.severe("No master context found to complete " + masterContext.jobIdString());
                 }
             }
-
-            jobLogListener.removeJobId(masterContext.jobId());
         });
     }
 

@@ -430,7 +430,8 @@ public class JobRepository {
             if (map.getName().startsWith(SNAPSHOT_DATA_MAP_PREFIX)) {
                 long id = jobIdFromPrefixedName(map.getName(), SNAPSHOT_DATA_MAP_PREFIX);
                 if (!activeJobs.contains(id)) {
-                    logFine(logger, "Deleting snapshot data map '%s' because job already finished", map.getName());
+                    logFine(logger, "Deleting snapshot data map '%s' because job %s already finished",
+                            map.getName(), idToString(id));
                     map.destroy();
                 }
             } else if (map.getName().startsWith(RESOURCES_MAP_NAME_PREFIX)) {
@@ -447,7 +448,8 @@ public class JobRepository {
         }
         if (jobResults.containsKey(id)) {
             // if job is finished, we can safely delete the map
-            logFine(logger, "Deleting job resource map '%s' because job is already finished", map.getName());
+            logFine(logger, "Deleting job resource map '%s' because job %s is already finished",
+                    map.getName(), idToString(id));
             map.destroy();
         } else {
             // Job might be in the process of uploading resources, check how long the map has been there.

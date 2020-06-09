@@ -39,10 +39,6 @@ public class JobLogListener implements LogListener {
                 id -> instance.getRingbuffer(JobLogUtil.ringbufferName(id)));
     }
 
-    public void removeJobId(long jobId) {
-        buffers.remove(Util.idToString(jobId));
-    }
-
     @Override
     public void log(LogEvent logEvent) {
         for (Map.Entry<String, Ringbuffer<String>> entry : buffers.entrySet()) {

@@ -152,7 +152,7 @@ public class JobExecutionService implements DynamicMetricsProvider {
     private void cancelAllExecutions(String reason, Supplier<RuntimeException> exceptionSupplier) {
         executionContexts.values().forEach(exeCtx -> {
             String message = String.format("Completing %s locally. Reason: %s",
-                    exeCtx.jobNameAndExecutionId(),
+                    exeCtx.jobNameIdAndExecutionId(),
                     reason);
             cancelAndComplete(exeCtx, message, exceptionSupplier.get());
         });
@@ -168,7 +168,7 @@ public class JobExecutionService implements DynamicMetricsProvider {
              .filter(exeCtx -> exeCtx.coordinator().equals(address) || exeCtx.hasParticipant(address))
              .forEach(exeCtx -> {
                  String message = String.format("Completing %s locally. Reason: Member %s left the cluster",
-                         exeCtx.jobNameAndExecutionId(),
+                         exeCtx.jobNameIdAndExecutionId(),
                          address);
                  cancelAndComplete(exeCtx, message, new TopologyChangedException("Topology has been changed."));
              });
@@ -186,7 +186,7 @@ public class JobExecutionService implements DynamicMetricsProvider {
                 completeExecution(executionId, t);
             }));
         } catch (Throwable e) {
-            logger.severe(String.format("Local cancellation of %s failed", exeCtx.jobNameAndExecutionId()), e);
+            logger.severe(String.format("Local cancellation of %s failed", exeCtx.jobNameIdAndExecutionId()), e);
         }
     }
 
@@ -217,7 +217,7 @@ public class JobExecutionService implements DynamicMetricsProvider {
             if (current != null) {
                 throw new IllegalStateException(String.format(
                         "Execution context for %s for coordinator %s already exists for coordinator %s",
-                        current.jobNameAndExecutionId(), coordinator, current.coordinator()));
+                        current.jobNameIdAndExecutionId(), coordinator, current.coordinator()));
             }
 
             // search contexts for one with different executionId, but same jobId
@@ -328,7 +328,7 @@ public class JobExecutionService implements DynamicMetricsProvider {
         } else if (!(executionContext.coordinator().equals(callerAddress) && executionContext.jobId() == jobId)) {
             throw new IllegalStateException(String.format(
                     "%s, originally from coordinator %s, cannot do '%s' by coordinator %s and execution %s",
-                    executionContext.jobNameAndExecutionId(), executionContext.coordinator(),
+                    executionContext.jobNameIdAndExecutionId(), executionContext.coordinator(),
                     callerOpName, callerAddress, idToString(executionId)));
         }
 
@@ -356,7 +356,7 @@ public class JobExecutionService implements DynamicMetricsProvider {
                 executionCompleted.inc();
                 removedClassLoader.shutdown();
                 executionContextJobIds.remove(executionContext.jobId());
-                logger.fine("Completed execution of " + executionContext.jobNameAndExecutionId());
+                logger.fine("Completed execution of " + executionContext.jobNameIdAndExecutionId());
             }
         } else {
             logger.fine("Execution " + idToString(executionId) + " not found for completion");
@@ -372,17 +372,17 @@ public class JobExecutionService implements DynamicMetricsProvider {
 
     public CompletableFuture<Void> beginExecution(Address coordinator, long jobId, long executionId) {
         ExecutionContext execCtx = assertExecutionContext(coordinator, jobId, executionId, "ExecuteJobOperation");
-        logger.info("Start execution of " + execCtx.jobNameAndExecutionId() + " from coordinator " + coordinator);
+        logger.info("Start execution of " + execCtx.jobNameIdAndExecutionId() + " from coordinator " + coordinator);
         executionStarted.inc();
         CompletableFuture<Void> future = execCtx.beginExecution();
         future.whenComplete(withTryCatch(logger, (i, e) -> {
             if (e instanceof CancellationException) {
-                logger.fine("Execution of " + execCtx.jobNameAndExecutionId() + " was cancelled");
+                logger.fine("Execution of " + execCtx.jobNameIdAndExecutionId() + " was cancelled");
             } else if (e != null) {
-                logger.fine("Execution of " + execCtx.jobNameAndExecutionId()
+                logger.fine("Execution of " + execCtx.jobNameIdAndExecutionId()
                         + " completed with failure", e);
             } else {
-                logger.fine("Execution of " + execCtx.jobNameAndExecutionId() + " completed");
+                logger.fine("Execution of " + execCtx.jobNameIdAndExecutionId() + " completed");
             }
         }));
         return future;
