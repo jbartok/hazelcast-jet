@@ -27,7 +27,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.logging.Level;
 
-import static com.hazelcast.jet.impl.util.Util.toLocalTime;
+import static com.hazelcast.jet.impl.util.Util.toLocalDateTime;
 
 public final class JobLogUtil {
 
@@ -60,12 +60,12 @@ public final class JobLogUtil {
 
     public static String format(Address member, long timestamp, String message, Level level, Throwable t) {
         StringBuilder sb = new StringBuilder()
+                .append(toLocalDateTime(timestamp))
+                .append(" ")
                 .append(member)
-                .append("@")
-                .append(toLocalTime(timestamp))
-                .append(" [")
+                .append(" ")
                 .append(level)
-                .append("] - ")
+                .append(" - ")
                 .append(message);
         if (t != null) {
             StringWriter stringWriter = new StringWriter();
