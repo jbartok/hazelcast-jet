@@ -24,6 +24,7 @@ import com.hazelcast.jet.pipeline.Pipeline;
 import com.hazelcast.jet.pipeline.Sinks;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
+import java.util.Map.Entry;
 import java.util.Properties;
 
 public class KafkaExample {
@@ -38,6 +39,7 @@ public class KafkaExample {
                 "my-topic"))
          .withoutTimestamps()
          .setLocalParallelism(1)
+         .map(Entry::getValue)
          .writeTo(Sinks.logger());
 
         JetInstance jet = Jet.bootstrappedInstance();

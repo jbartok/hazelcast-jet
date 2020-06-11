@@ -24,7 +24,6 @@ import com.hazelcast.jet.aggregate.AggregateOperations;
 import com.hazelcast.jet.config.JobConfig;
 import com.hazelcast.jet.config.ProcessingGuarantee;
 import com.hazelcast.jet.datamodel.WindowResult;
-import com.hazelcast.jet.function.Observer;
 import com.hazelcast.jet.pipeline.Pipeline;
 import com.hazelcast.jet.pipeline.Sinks;
 import com.hazelcast.jet.pipeline.StreamStage;
@@ -57,7 +56,7 @@ public class HelloWorld {
 //                .map(Library::doSomethingAndLog)
                 ;
 
-        stage.writeTo(Sinks.observable(RESULTS));
+//        stage.writeTo(Sinks.observable(RESULTS));
         stage.writeTo(Sinks.logger());
         return p;
     }
@@ -69,16 +68,13 @@ public class HelloWorld {
     public static void main(String[] args) {
         JetInstance jet = Jet.bootstrappedInstance();
 
-        Observable<List<Long>> observable = jet.getObservable(RESULTS);
-        observable.addObserver(Observer.of(HelloWorld::printResults));
-
         Pipeline p = buildPipeline();
 
         JobConfig config = new JobConfig();
         config.setName("hello-world");
         config.setPublishLogs(true);
         config.setProcessingGuarantee(ProcessingGuarantee.EXACTLY_ONCE);
-        jet.newJobIfAbsent(p, config).join();
+        jet.newJobIfAbsent(p, config);
     }
 
     private static void printResults(List<Long> topNumbers) {
