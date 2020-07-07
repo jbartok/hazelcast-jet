@@ -53,6 +53,7 @@ Apache License, Version 2.0
   Debezium API:1.2.1.Final
   Debezium Connector for MySQL:1.2.1.Final
   Debezium Connector for PostgreSQL:1.2.1.Final
+  Debezium Connector for MS SQL Server:1.2.1.Final
   Debezium Core:1.2.1.Final
   Debezium ANTLR DDL parsers:1.2.1.Final
   io.grpc:grpc-api:1.31.0
@@ -159,6 +160,7 @@ LGPL, version 2.1
   Java Native Access:5.5.0
   Java Native Access Platform:5.5.0
 MIT License
+  Microsoft JDBC Driver for SQL Server:7.2.2.jre8
   ClassGraph:4.8.66
   JOpt Simple:5.0.2
   Checker Qual:2.5.5
