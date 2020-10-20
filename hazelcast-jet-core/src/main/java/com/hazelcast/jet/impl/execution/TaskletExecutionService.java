@@ -26,6 +26,7 @@ import com.hazelcast.internal.util.counters.MwCounter;
 import com.hazelcast.internal.util.counters.SwCounter;
 import com.hazelcast.jet.JetException;
 import com.hazelcast.jet.core.metrics.MetricTags;
+import com.hazelcast.jet.datamodel.Tuple2;
 import com.hazelcast.jet.impl.metrics.MetricsImpl;
 import com.hazelcast.jet.impl.util.NonCompletableFuture;
 import com.hazelcast.jet.impl.util.ProgressState;
@@ -137,6 +138,7 @@ public class TaskletExecutionService {
      * @param jobClassLoader      classloader to use when running the tasklets
      */
     CompletableFuture<Void> beginExecute(
+            long priority,
             @Nonnull List<? extends Tasklet> tasklets,
             @Nonnull CompletableFuture<Void> cancellationFuture,
             @Nonnull ClassLoader jobClassLoader
@@ -145,7 +147,7 @@ public class TaskletExecutionService {
         try {
             final Map<Boolean, List<Tasklet>> byCooperation =
                     tasklets.stream().collect(partitioningBy(Tasklet::isCooperative));
-            submitCooperativeTasklets(executionTracker, jobClassLoader, byCooperation.get(true));
+            submitCooperativeTasklets(priority, executionTracker, jobClassLoader, byCooperation.get(true));
             submitBlockingTasklets(executionTracker, jobClassLoader, byCooperation.get(false));
         } catch (Throwable t) {
             executionTracker.future.internalCompleteExceptionally(t);
@@ -176,10 +178,10 @@ public class TaskletExecutionService {
     }
 
     private void submitCooperativeTasklets(
-            ExecutionTracker executionTracker, ClassLoader jobClassLoader, List<Tasklet> tasklets
+            long priority, ExecutionTracker executionTracker, ClassLoader jobClassLoader, List<Tasklet> tasklets
     ) {
         @SuppressWarnings("unchecked")
-        final List<TaskletTracker>[] trackersByThread = new List[cooperativeWorkers.length];
+        final List<Tuple2<Long, TaskletTracker>>[] trackersByThread = new List[cooperativeWorkers.length];
         Arrays.setAll(trackersByThread, i -> new ArrayList());
         List<? extends Future<?>> futures = tasklets
                 .stream()
@@ -194,7 +196,8 @@ public class TaskletExecutionService {
         // some worker might have no tasklet.
         synchronized (lock) {
             for (Tasklet t : tasklets) {
-                trackersByThread[cooperativeThreadIndex].add(new TaskletTracker(t, executionTracker, jobClassLoader));
+                trackersByThread[cooperativeThreadIndex].add(Tuple2.tuple2(priority,
+                        new TaskletTracker(t, executionTracker, jobClassLoader)));
                 cooperativeThreadIndex = (cooperativeThreadIndex + 1) % trackersByThread.length;
             }
         }
@@ -315,13 +318,13 @@ public class TaskletExecutionService {
         private static final int COOPERATIVE_LOGGING_THRESHOLD = 5;
 
         @Probe(name = "taskletCount")
-        private final CopyOnWriteArrayList<TaskletTracker> trackers;
+        private final CopyOnWriteArrayList<Tuple2<Long, TaskletTracker>> trackers;
         @Probe(name = "iterationCount")
         private final Counter iterationCount = SwCounter.newSwCounter();
 
         private final ProgressTracker progressTracker = new ProgressTracker();
         // prevent lambda allocation on each iteration
-        private final Consumer<TaskletTracker> runTasklet = this::runTasklet;
+        private final Consumer<Tuple2<Long, TaskletTracker>> runTasklet = this::runTasklet;
 
         private boolean finestLogEnabled;
         private Thread myThread;
@@ -351,37 +354,38 @@ public class TaskletExecutionService {
                     idlerLocal.idle(++idleCount);
                 }
             }
-            trackers.forEach(t -> t.executionTracker.taskletDone());
+            trackers.forEach(t -> t.f1().executionTracker.taskletDone());
             trackers.clear();
         }
 
-        private void runTasklet(TaskletTracker t) {
+        private void runTasklet(Tuple2<Long, TaskletTracker> tuple) {
             long start = 0;
             if (finestLogEnabled) {
                 start = System.nanoTime();
             }
+            TaskletTracker tracker = tuple.f1();
             try {
-                myThread.setContextClassLoader(t.jobClassLoader);
-                userMetricsContextContainer.setContext(t.tasklet.getMetricsContext());
-                final ProgressState result = t.tasklet.call();
+                myThread.setContextClassLoader(tracker.jobClassLoader);
+                userMetricsContextContainer.setContext(tracker.tasklet.getMetricsContext());
+                final ProgressState result = tracker.tasklet.call();
                 if (result.isDone()) {
-                    dismissTasklet(t);
+                    dismissTasklet(tracker);
                 }
                 progressTracker.mergeWith(result);
             } catch (Throwable e) {
-                logger.warning("Exception in " + t.tasklet, e);
-                t.executionTracker.exception(new JetException("Exception in " + t.tasklet + ": " + e, e));
+                logger.warning("Exception in " + tracker.tasklet, e);
+                tracker.executionTracker.exception(new JetException("Exception in " + tracker.tasklet + ": " + e, e));
             } finally {
                 userMetricsContextContainer.setContext(null);
             }
-            if (t.executionTracker.executionCompletedExceptionally()) {
-                dismissTasklet(t);
+            if (tracker.executionTracker.executionCompletedExceptionally()) {
+                dismissTasklet(tracker);
             }
 
             if (finestLogEnabled) {
                 long elapsedMs = NANOSECONDS.toMillis((System.nanoTime() - start));
                 if (elapsedMs > COOPERATIVE_LOGGING_THRESHOLD) {
-                    logger.finest("Cooperative tasklet call of '" + t.tasklet + "' took more than "
+                    logger.finest("Cooperative tasklet call of '" + tracker.tasklet + "' took more than "
                             + COOPERATIVE_LOGGING_THRESHOLD + " ms: " + elapsedMs + "ms");
                 }
             }

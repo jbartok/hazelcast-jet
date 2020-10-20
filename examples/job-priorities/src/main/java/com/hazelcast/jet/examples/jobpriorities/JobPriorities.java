@@ -21,7 +21,7 @@ public class JobPriorities {
 
     public static void main(String[] args) throws Exception {
         JetInstance jet = Jet.bootstrappedInstance();
-        new JobPrioritiesGui(jet.getMap(RESULT_MAP_NAME));
+        JobPrioritiesGui gui = new JobPrioritiesGui(jet.getMap(RESULT_MAP_NAME));
 
         try {
             Job[] jobs = new Job[args.length];
@@ -38,6 +38,8 @@ public class JobPriorities {
                 job.cancel();
                 job.join();
             });
+
+            gui.stop();
         } finally {
             Jet.shutdownAll();
         }
@@ -48,7 +50,9 @@ public class JobPriorities {
         p.readFrom(TestSources.itemStream(2_000))
                 .withIngestionTimestamps()
                 .rollingAggregate(AggregateOperations.counting())
+                .setLocalParallelism(2)
                 .map(count -> entry(jobName, count))
+                .setLocalParallelism(2)
                 .writeTo(Sinks.map(RESULT_MAP_NAME));
         return p;
     }

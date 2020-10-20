@@ -236,7 +236,7 @@ public class TaskletExecutionServiceTest extends JetTestSupport {
                       .limit(100).collect(toList());
 
         // When
-        CompletableFuture<Void> f = tes.beginExecute(tasklets, cancellationFuture, classLoaderMock);
+        CompletableFuture<Void> f = tes.beginExecute(1, tasklets, cancellationFuture, classLoaderMock);
         cancellationFuture.cancel(true);
 
         // Then
@@ -254,7 +254,7 @@ public class TaskletExecutionServiceTest extends JetTestSupport {
                       .limit(100).collect(toList());
 
         // When
-        CompletableFuture<Void> f = tes.beginExecute(tasklets, cancellationFuture, classLoaderMock);
+        CompletableFuture<Void> f = tes.beginExecute(1, tasklets, cancellationFuture, classLoaderMock);
         cancellationFuture.cancel(true);
 
         // Then
@@ -272,7 +272,7 @@ public class TaskletExecutionServiceTest extends JetTestSupport {
                       .limit(100).collect(toList());
 
         // When
-        CompletableFuture<Void> f = tes.beginExecute(tasklets, cancellationFuture, classLoaderMock);
+        CompletableFuture<Void> f = tes.beginExecute(1, tasklets, cancellationFuture, classLoaderMock);
         cancellationFuture.cancel(true);
 
         // Then
@@ -292,7 +292,7 @@ public class TaskletExecutionServiceTest extends JetTestSupport {
                       .limit(100).collect(toList());
 
         // When
-        CompletableFuture<Void> f = tes.beginExecute(tasklets, cancellationFuture, classLoaderMock);
+        CompletableFuture<Void> f = tes.beginExecute(1, tasklets, cancellationFuture, classLoaderMock);
 
         cancellationFuture.cancel(true);
 
@@ -317,8 +317,8 @@ public class TaskletExecutionServiceTest extends JetTestSupport {
         assertTrue(t1.isCooperative());
 
         // When
-        CompletableFuture<Void> f1 = tes.beginExecute(singletonList(t1), new CompletableFuture<>(), classLoaderMock);
-        CompletableFuture<Void> f2 = tes.beginExecute(singletonList(t2), new CompletableFuture<>(), classLoaderMock);
+        CompletableFuture<Void> f1 = tes.beginExecute(1, singletonList(t1), new CompletableFuture<>(), classLoaderMock);
+        CompletableFuture<Void> f2 = tes.beginExecute(1, singletonList(t2), new CompletableFuture<>(), classLoaderMock);
         f1.join();
         f2.join();
 
@@ -330,7 +330,7 @@ public class TaskletExecutionServiceTest extends JetTestSupport {
     public void when_tryCompleteOnReturnedFuture_then_fails() {
         // Given
         final MockTasklet t = new MockTasklet().callsBeforeDone(Integer.MAX_VALUE);
-        CompletableFuture<Void> f = tes.beginExecute(singletonList(t), cancellationFuture, classLoaderMock);
+        CompletableFuture<Void> f = tes.beginExecute(1, singletonList(t), cancellationFuture, classLoaderMock);
 
         // When - Then
         exceptionRule.expect(UnsupportedOperationException.class);
@@ -341,7 +341,7 @@ public class TaskletExecutionServiceTest extends JetTestSupport {
     public void when_tryCompleteExceptionallyOnReturnedFuture_then_fails() {
         // Given
         final MockTasklet t = new MockTasklet().callsBeforeDone(Integer.MAX_VALUE);
-        CompletableFuture<Void> f = tes.beginExecute(singletonList(t), cancellationFuture, classLoaderMock);
+        CompletableFuture<Void> f = tes.beginExecute(1, singletonList(t), cancellationFuture, classLoaderMock);
 
         // When - Then
         exceptionRule.expect(UnsupportedOperationException.class);
@@ -352,7 +352,7 @@ public class TaskletExecutionServiceTest extends JetTestSupport {
     public void when_tryCancelOnReturnedFuture_then_fails() {
         // Given
         final MockTasklet t = new MockTasklet().callsBeforeDone(Integer.MAX_VALUE);
-        CompletableFuture<Void> f = tes.beginExecute(singletonList(t), cancellationFuture, classLoaderMock);
+        CompletableFuture<Void> f = tes.beginExecute(1, singletonList(t), cancellationFuture, classLoaderMock);
 
         // When - Then
         exceptionRule.expect(UnsupportedOperationException.class);
@@ -363,7 +363,7 @@ public class TaskletExecutionServiceTest extends JetTestSupport {
     public void when_cancellationFutureCompleted_then_fails() throws Throwable {
         // Given
         final MockTasklet t = new MockTasklet().callsBeforeDone(Integer.MAX_VALUE);
-        CompletableFuture<Void> f = tes.beginExecute(singletonList(t), cancellationFuture, classLoaderMock);
+        CompletableFuture<Void> f = tes.beginExecute(1, singletonList(t), cancellationFuture, classLoaderMock);
 
         // When
         cancellationFuture.complete(null);
@@ -378,7 +378,7 @@ public class TaskletExecutionServiceTest extends JetTestSupport {
     }
 
     private void executeAndJoin(List<MockTasklet> tasklets) {
-        CompletableFuture<Void> f = tes.beginExecute(tasklets, cancellationFuture, classLoaderMock);
+        CompletableFuture<Void> f = tes.beginExecute(1, tasklets, cancellationFuture, classLoaderMock);
         f.join();
     }
 

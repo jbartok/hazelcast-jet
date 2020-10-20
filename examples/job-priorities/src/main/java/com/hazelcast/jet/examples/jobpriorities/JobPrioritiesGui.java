@@ -76,4 +76,8 @@ public class JobPrioritiesGui {
         });
         return plot;
     }
+
+    public void stop() {
+        hzMap.removeEntryListener(entryListenerId);
+    }
 }
