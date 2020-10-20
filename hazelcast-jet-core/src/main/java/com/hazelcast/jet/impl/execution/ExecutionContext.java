@@ -101,7 +101,7 @@ public class ExecutionContext implements DynamicMetricsProvider {
     private final TaskletExecutionService taskletExecService;
     private SnapshotContext snapshotContext;
     private JobConfig jobConfig;
-    private long jobPriority;
+    private int jobPriority;
 
     private boolean metricsEnabled;
     private volatile RawJobMetrics jobMetrics = RawJobMetrics.empty();
@@ -126,7 +126,6 @@ public class ExecutionContext implements DynamicMetricsProvider {
         jobConfig = plan.getJobConfig();
         jobName = jobConfig.getName() == null ? jobName : jobConfig.getName();
         jobPriority = getPriority(jobName);
-        System.err.println("jobName = " + jobName + ", jobPriority = " + jobPriority); //todo: remove
 
         // Must be populated early, so all processor suppliers are
         // available to be completed in the case of init failure
@@ -148,10 +147,10 @@ public class ExecutionContext implements DynamicMetricsProvider {
         return this;
     }
 
-    private static long getPriority(String jobName) {
+    private static int getPriority(String jobName) {
         if (jobName.contains(":")) {
             try {
-                long priority = Long.parseLong(jobName.substring(0, jobName.indexOf(':')));
+                int priority = Integer.parseInt(jobName.substring(0, jobName.indexOf(':')));
                 if (priority > 0) {
                     return priority;
                 }

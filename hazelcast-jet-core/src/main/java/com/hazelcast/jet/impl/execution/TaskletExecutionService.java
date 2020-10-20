@@ -26,7 +26,6 @@ import com.hazelcast.internal.util.counters.MwCounter;
 import com.hazelcast.internal.util.counters.SwCounter;
 import com.hazelcast.jet.JetException;
 import com.hazelcast.jet.core.metrics.MetricTags;
-import com.hazelcast.jet.datamodel.Tuple2;
 import com.hazelcast.jet.impl.metrics.MetricsImpl;
 import com.hazelcast.jet.impl.util.NonCompletableFuture;
 import com.hazelcast.jet.impl.util.ProgressState;
@@ -138,7 +137,7 @@ public class TaskletExecutionService {
      * @param jobClassLoader      classloader to use when running the tasklets
      */
     CompletableFuture<Void> beginExecute(
-            long priority,
+            int priority,
             @Nonnull List<? extends Tasklet> tasklets,
             @Nonnull CompletableFuture<Void> cancellationFuture,
             @Nonnull ClassLoader jobClassLoader
@@ -166,7 +165,7 @@ public class TaskletExecutionService {
         CountDownLatch startedLatch = new CountDownLatch(tasklets.size());
         executionTracker.blockingFutures = tasklets
                 .stream()
-                .map(t -> new BlockingWorker(new TaskletTracker(t, executionTracker, jobClassLoader), startedLatch))
+                .map(t -> new BlockingWorker(new TaskletTracker(t, 1, executionTracker, jobClassLoader), startedLatch))
                 .map(blockingTaskletExecutor::submit)
                 .collect(toList());
 
@@ -178,11 +177,11 @@ public class TaskletExecutionService {
     }
 
     private void submitCooperativeTasklets(
-            long priority, ExecutionTracker executionTracker, ClassLoader jobClassLoader, List<Tasklet> tasklets
+            int priority, ExecutionTracker executionTracker, ClassLoader jobClassLoader, List<Tasklet> tasklets
     ) {
         @SuppressWarnings("unchecked")
-        final List<Tuple2<Long, TaskletTracker>>[] trackersByThread = new List[cooperativeWorkers.length];
-        Arrays.setAll(trackersByThread, i -> new ArrayList());
+        final List<TaskletTracker>[] trackersByThread = new List[cooperativeWorkers.length];
+        Arrays.setAll(trackersByThread, i -> new ArrayList<>());
         List<? extends Future<?>> futures = tasklets
                 .stream()
                 .map(tasklet -> hzExecutionService.submit(TASKLET_INIT_CLOSE_EXECUTOR_NAME, () ->
@@ -196,8 +195,8 @@ public class TaskletExecutionService {
         // some worker might have no tasklet.
         synchronized (lock) {
             for (Tasklet t : tasklets) {
-                trackersByThread[cooperativeThreadIndex].add(Tuple2.tuple2(priority,
-                        new TaskletTracker(t, executionTracker, jobClassLoader)));
+                trackersByThread[cooperativeThreadIndex].add(
+                        new TaskletTracker(t, priority, executionTracker, jobClassLoader));
                 cooperativeThreadIndex = (cooperativeThreadIndex + 1) % trackersByThread.length;
             }
         }
@@ -318,13 +317,13 @@ public class TaskletExecutionService {
         private static final int COOPERATIVE_LOGGING_THRESHOLD = 5;
 
         @Probe(name = "taskletCount")
-        private final CopyOnWriteArrayList<Tuple2<Long, TaskletTracker>> trackers;
+        private final CopyOnWriteArrayList<TaskletTracker> trackers;
         @Probe(name = "iterationCount")
         private final Counter iterationCount = SwCounter.newSwCounter();
 
         private final ProgressTracker progressTracker = new ProgressTracker();
         // prevent lambda allocation on each iteration
-        private final Consumer<Tuple2<Long, TaskletTracker>> runTasklet = this::runTasklet;
+        private final Consumer<TaskletTracker> runTasklet = this::runTasklet;
 
         private boolean finestLogEnabled;
         private Thread myThread;
@@ -354,25 +353,23 @@ public class TaskletExecutionService {
                     idlerLocal.idle(++idleCount);
                 }
             }
-            trackers.forEach(t -> t.f1().executionTracker.taskletDone());
+            trackers.forEach(t -> t.executionTracker.taskletDone());
             trackers.clear();
         }
 
-        private void runTasklet(Tuple2<Long, TaskletTracker> tuple) {
+        private void runTasklet(TaskletTracker t) {
             long start = 0;
             if (finestLogEnabled) {
                 start = System.nanoTime();
             }
-            TaskletTracker tracker = tuple.f1();
             try {
-                myThread.setContextClassLoader(tracker.jobClassLoader);
-                userMetricsContextContainer.setContext(tracker.tasklet.getMetricsContext());
-                long priority = tuple.f0();
-                for (int i = 0; i < priority; i++) {
-                    final ProgressState result = tracker.tasklet.call();
+                myThread.setContextClassLoader(t.jobClassLoader);
+                userMetricsContextContainer.setContext(t.tasklet.getMetricsContext());
+                for (int i = 0; i < t.priority; i++) {
+                    final ProgressState result = t.tasklet.call();
                     progressTracker.mergeWith(result);
                     if (result.isDone()) {
-                        dismissTasklet(tracker);
+                        dismissTasklet(t);
                         break;
                     }
                     if (!result.isMadeProgress()) {
@@ -380,19 +377,19 @@ public class TaskletExecutionService {
                     }
                 }
             } catch (Throwable e) {
-                logger.warning("Exception in " + tracker.tasklet, e);
-                tracker.executionTracker.exception(new JetException("Exception in " + tracker.tasklet + ": " + e, e));
+                logger.warning("Exception in " + t.tasklet, e);
+                t.executionTracker.exception(new JetException("Exception in " + t.tasklet + ": " + e, e));
             } finally {
                 userMetricsContextContainer.setContext(null);
             }
-            if (tracker.executionTracker.executionCompletedExceptionally()) {
-                dismissTasklet(tracker);
+            if (t.executionTracker.executionCompletedExceptionally()) {
+                dismissTasklet(t);
             }
 
             if (finestLogEnabled) {
                 long elapsedMs = NANOSECONDS.toMillis((System.nanoTime() - start));
                 if (elapsedMs > COOPERATIVE_LOGGING_THRESHOLD) {
-                    logger.finest("Cooperative tasklet call of '" + tracker.tasklet + "' took more than "
+                    logger.finest("Cooperative tasklet call of '" + t.tasklet + "' took more than "
                             + COOPERATIVE_LOGGING_THRESHOLD + " ms: " + elapsedMs + "ms");
                 }
             }
@@ -407,11 +404,13 @@ public class TaskletExecutionService {
 
     private static final class TaskletTracker {
         final Tasklet tasklet;
+        final int priority;
         final ExecutionTracker executionTracker;
         final ClassLoader jobClassLoader;
 
-        TaskletTracker(Tasklet tasklet, ExecutionTracker executionTracker, ClassLoader jobClassLoader) {
+        TaskletTracker(Tasklet tasklet, int priority, ExecutionTracker executionTracker, ClassLoader jobClassLoader) {
             this.tasklet = tasklet;
+            this.priority = priority;
             this.executionTracker = executionTracker;
             this.jobClassLoader = jobClassLoader;
         }
