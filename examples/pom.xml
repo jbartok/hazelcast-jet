@@ -49,6 +49,7 @@
         <module>jdbc</module>
         <module>jms</module>
         <module>job-management</module>
+        <module>job-priorities</module>
         <module>kafka</module>
         <module>pattern-matching</module>
         <module>protobuf</module>
