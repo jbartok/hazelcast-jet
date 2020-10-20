@@ -4,6 +4,7 @@ import com.hazelcast.jet.Jet;
 import com.hazelcast.jet.JetInstance;
 import com.hazelcast.jet.Job;
 import com.hazelcast.jet.aggregate.AggregateOperations;
+import com.hazelcast.jet.config.JetConfig;
 import com.hazelcast.jet.config.JobConfig;
 import com.hazelcast.jet.core.ProcessorMetaSupplier;
 import com.hazelcast.jet.datamodel.WindowResult;
@@ -24,7 +25,10 @@ public class JobPriorities {
     private static final int DURATION_SECONDS = 60;
 
     public static void main(String[] args) throws Exception {
-        JetInstance jet = Jet.bootstrappedInstance();
+        JetConfig jetConfig = new JetConfig();
+        jetConfig.getInstanceConfig().setCooperativeThreadCount(6);
+        JetInstance jet = Jet.newJetInstance(jetConfig);
+
         JobPrioritiesGui gui = new JobPrioritiesGui(jet.getMap(RESULT_MAP_NAME));
 
         try {
@@ -53,8 +57,7 @@ public class JobPriorities {
         Pipeline p = Pipeline.create();
         p.readFrom(modifiedLongStream())
                 .withNativeTimestamps(0)
-                .setLocalParallelism(2)
-                .window(WindowDefinition.tumbling(250))
+                .window(WindowDefinition.tumbling(200))
                 .aggregate(AggregateOperations.counting())
                 .writeTo(Sinks.mapWithMerging(RESULT_MAP_NAME, result -> jobName, WindowResult::result, Long::sum));
         return p;

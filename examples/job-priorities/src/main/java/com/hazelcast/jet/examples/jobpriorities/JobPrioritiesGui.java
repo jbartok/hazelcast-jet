@@ -25,7 +25,7 @@ public class JobPrioritiesGui {
     private static final int WINDOW_Y = 100;
     private static final int WINDOW_WIDTH = 1200;
     private static final int WINDOW_HEIGHT = 650;
-    private static final int INITIAL_TOP_Y = 50_000;
+    private static final int INITIAL_TOP_Y = 10_000_000;
 
     private final IMap<String, Long> hzMap;
     private UUID entryListenerId;
