@@ -124,6 +124,7 @@ public class ExecutionContext implements DynamicMetricsProvider {
     public ExecutionContext initialize(ExecutionPlan plan) {
         jobConfig = plan.getJobConfig();
         jobName = jobConfig.getName() == null ? jobName : jobConfig.getName();
+        System.err.println("jobName = " + jobName); //todo: remove
 
         // Must be populated early, so all processor suppliers are
         // available to be completed in the case of init failure

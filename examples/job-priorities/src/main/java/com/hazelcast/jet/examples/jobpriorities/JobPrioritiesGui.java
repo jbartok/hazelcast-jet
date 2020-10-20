@@ -25,7 +25,7 @@ public class JobPrioritiesGui {
     private static final int WINDOW_Y = 100;
     private static final int WINDOW_WIDTH = 1200;
     private static final int WINDOW_HEIGHT = 650;
-    private static final int INITIAL_TOP_Y = 5_000_000;
+    private static final int INITIAL_TOP_Y = 50_000;
 
     private final IMap<String, Long> hzMap;
     private UUID entryListenerId;
@@ -42,7 +42,6 @@ public class JobPrioritiesGui {
 
         long[] topY = {INITIAL_TOP_Y};
         EntryUpdatedListener<String, Long> entryUpdatedListener = event -> {
-            System.err.println("event = " + event); //todo: remove
             EventQueue.invokeLater(() -> {
                 dataset.addValue(event.getValue(), event.getKey(), "");
                 topY[0] = max(topY[0], INITIAL_TOP_Y * (1 + event.getValue() / INITIAL_TOP_Y));

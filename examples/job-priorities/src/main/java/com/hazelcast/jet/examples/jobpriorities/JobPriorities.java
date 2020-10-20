@@ -3,11 +3,15 @@ package com.hazelcast.jet.examples.jobpriorities;
 import com.hazelcast.jet.Jet;
 import com.hazelcast.jet.JetInstance;
 import com.hazelcast.jet.Job;
+import com.hazelcast.jet.aggregate.AggregateOperations;
 import com.hazelcast.jet.config.JobConfig;
 import com.hazelcast.jet.pipeline.Pipeline;
+import com.hazelcast.jet.pipeline.Sinks;
+import com.hazelcast.jet.pipeline.test.TestSources;
 
 import java.util.Arrays;
 
+import static com.hazelcast.jet.Util.entry;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 public class JobPriorities {
@@ -20,11 +24,13 @@ public class JobPriorities {
         new JobPrioritiesGui(jet.getMap(RESULT_MAP_NAME));
 
         try {
-            Job[] jobs = Arrays.stream(args)
-                    .mapToLong(Long::parseLong)
-                    .mapToObj(priority -> priority + ":job")
-                    .map(jobName -> jet.newJob(buildPipeline(), new JobConfig().setName(jobName)))
-                    .toArray(Job[]::new);
+            Job[] jobs = new Job[args.length];
+
+            for (int i = 0; i < args.length; i++) {
+                long priority = Long.parseLong(args[i]);
+                String jobName = priority + ":job" + i;
+                jobs[i] = jet.newJob(buildPipeline(jobName), new JobConfig().setName(jobName));
+            }
 
             SECONDS.sleep(DURATION_SECONDS);
 
@@ -37,9 +43,13 @@ public class JobPriorities {
         }
     }
 
-    private static Pipeline buildPipeline() {
+    private static Pipeline buildPipeline(String jobName) {
         Pipeline p = Pipeline.create();
-        //todo: define pipeline here
+        p.readFrom(TestSources.itemStream(2_000))
+                .withIngestionTimestamps()
+                .rollingAggregate(AggregateOperations.counting())
+                .map(count -> entry(jobName, count))
+                .writeTo(Sinks.map(RESULT_MAP_NAME));
         return p;
     }
 
