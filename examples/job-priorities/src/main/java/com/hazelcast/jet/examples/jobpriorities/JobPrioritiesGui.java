@@ -25,10 +25,11 @@ public class JobPrioritiesGui {
     private static final int WINDOW_Y = 100;
     private static final int WINDOW_WIDTH = 1200;
     private static final int WINDOW_HEIGHT = 650;
-    private static final int INITIAL_TOP_Y = 10_000_000;
+    private static final int INITIAL_TOP_Y = 30_000_000;
 
     private final IMap<String, Long> hzMap;
     private UUID entryListenerId;
+    private JFrame frame;
 
     public JobPrioritiesGui(IMap<String, Long> hzMap) {
         this.hzMap = hzMap;
@@ -37,9 +38,11 @@ public class JobPrioritiesGui {
 
     private void startGui() {
         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
-        CategoryPlot chartFrame = createChartFrame(dataset);
-        ValueAxis yAxis = chartFrame.getRangeAxis();
+        JFreeChart chart = createChart(dataset);
+        frame = createJFrame(chart);
 
+        CategoryPlot plot = createPlot(chart);
+        ValueAxis yAxis = plot.getRangeAxis();
         long[] topY = {INITIAL_TOP_Y};
         EntryUpdatedListener<String, Long> entryUpdatedListener = event -> {
             EventQueue.invokeLater(() -> {
@@ -48,19 +51,17 @@ public class JobPrioritiesGui {
                 yAxis.setRange(0, topY[0]);
             });
         };
+
         entryListenerId = hzMap.addEntryListener(entryUpdatedListener, true);
     }
 
-    private CategoryPlot createChartFrame(CategoryDataset dataset) {
-        JFreeChart chart = ChartFactory.createBarChart(
+    private JFreeChart createChart(CategoryDataset dataset) {
+        return ChartFactory.createBarChart(
                 "Job Results", "Job", "Results", dataset,
                 PlotOrientation.HORIZONTAL, true, true, false);
-        CategoryPlot plot = chart.getCategoryPlot();
-        plot.setBackgroundPaint(Color.WHITE);
-        plot.setDomainGridlinePaint(Color.DARK_GRAY);
-        plot.setRangeGridlinePaint(Color.DARK_GRAY);
-        plot.getRenderer().setSeriesPaint(0, Color.BLUE);
+    }
 
+    private JFrame createJFrame(JFreeChart chart) {
         JFrame frame = new JFrame();
         frame.setBackground(Color.WHITE);
         frame.setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -74,10 +75,20 @@ public class JobPrioritiesGui {
                 hzMap.removeEntryListener(entryListenerId);
             }
         });
+        return frame;
+    }
+
+    private CategoryPlot createPlot(JFreeChart chart) {
+        CategoryPlot plot = chart.getCategoryPlot();
+        plot.setBackgroundPaint(Color.WHITE);
+        plot.setDomainGridlinePaint(Color.DARK_GRAY);
+        plot.setRangeGridlinePaint(Color.DARK_GRAY);
+        plot.getRenderer().setSeriesPaint(0, Color.BLUE);
         return plot;
     }
 
     public void stop() {
-        hzMap.removeEntryListener(entryListenerId);
+        frame.setVisible(false);
+        frame.dispose();
     }
 }

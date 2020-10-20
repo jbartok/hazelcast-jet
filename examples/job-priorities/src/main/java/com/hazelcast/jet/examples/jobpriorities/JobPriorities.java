@@ -14,50 +14,67 @@ import com.hazelcast.jet.pipeline.Sources;
 import com.hazelcast.jet.pipeline.StreamSource;
 import com.hazelcast.jet.pipeline.WindowDefinition;
 import com.hazelcast.jet.pipeline.test.ModifiedLongStreamSourceP;
+import com.hazelcast.map.IMap;
 
 import java.util.Arrays;
+import java.util.concurrent.CancellationException;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 public class JobPriorities {
 
     private static final String RESULT_MAP_NAME = "results-by-job";
-    private static final int DURATION_SECONDS = 60;
+    private static final int DURATION_SECONDS = 15;
 
     public static void main(String[] args) throws Exception {
-        JetConfig jetConfig = new JetConfig();
-        jetConfig.getInstanceConfig().setCooperativeThreadCount(6);
-        JetInstance jet = Jet.newJetInstance(jetConfig);
-
-        JobPrioritiesGui gui = new JobPrioritiesGui(jet.getMap(RESULT_MAP_NAME));
-
         try {
-            Job[] jobs = new Job[args.length];
+            JetConfig jetConfig = new JetConfig();
+            jetConfig.getInstanceConfig().setCooperativeThreadCount(6);
+            JetInstance jet = Jet.newJetInstance(jetConfig);
 
-            for (int i = 0; i < args.length; i++) {
-                long priority = Long.parseLong(args[i]);
-                String jobName = priority + ":job" + i;
-                jobs[i] = jet.newJob(buildPipeline(jobName), new JobConfig().setName(jobName));
+            while (true) {
+                run(jet, 1, 1, 1, 1, 1, 1, 1);
+                run(jet, 1, 1, 1, 1, 2, 3, 4);
+                run(jet, 1, 1, 2, 2, 3, 3, 4);
             }
-
-            SECONDS.sleep(DURATION_SECONDS);
-
-            Arrays.stream(jobs).forEach(job -> {
-                job.cancel();
-                job.join();
-            });
-
-            gui.stop();
         } finally {
             Jet.shutdownAll();
         }
+    }
+
+    private static void run(JetInstance jet, long... priorities) throws InterruptedException {
+        IMap<String, Long> map = jet.getMap(RESULT_MAP_NAME);
+
+        JobPrioritiesGui gui = new JobPrioritiesGui(map);
+
+        Job[] jobs = new Job[priorities.length];
+
+        for (int i = 0; i < priorities.length; i++) {
+            String jobName = priorities[i] + ":job" + i;
+            jobs[i] = jet.newJob(buildPipeline(jobName), new JobConfig().setName(jobName));
+        }
+
+        SECONDS.sleep(DURATION_SECONDS);
+
+        gui.stop();
+
+        Arrays.stream(jobs).forEach(job -> {
+            try {
+                job.cancel();
+                job.join();
+            } catch (CancellationException ce) {
+                //ignore
+            }
+        });
+
+        map.clear();
     }
 
     private static Pipeline buildPipeline(String jobName) {
         Pipeline p = Pipeline.create();
         p.readFrom(modifiedLongStream())
                 .withNativeTimestamps(0)
-                .window(WindowDefinition.tumbling(200))
+                .window(WindowDefinition.tumbling(50))
                 .aggregate(AggregateOperations.counting())
                 .writeTo(Sinks.mapWithMerging(RESULT_MAP_NAME, result -> jobName, WindowResult::result, Long::sum));
         return p;
