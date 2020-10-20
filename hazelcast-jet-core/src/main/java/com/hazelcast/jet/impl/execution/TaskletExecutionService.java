@@ -367,11 +367,18 @@ public class TaskletExecutionService {
             try {
                 myThread.setContextClassLoader(tracker.jobClassLoader);
                 userMetricsContextContainer.setContext(tracker.tasklet.getMetricsContext());
-                final ProgressState result = tracker.tasklet.call();
-                if (result.isDone()) {
-                    dismissTasklet(tracker);
+                long priority = tuple.f0();
+                for (int i = 0; i < priority; i++) {
+                    final ProgressState result = tracker.tasklet.call();
+                    progressTracker.mergeWith(result);
+                    if (result.isDone()) {
+                        dismissTasklet(tracker);
+                        break;
+                    }
+                    if (!result.isMadeProgress()) {
+                        break;
+                    }
                 }
-                progressTracker.mergeWith(result);
             } catch (Throwable e) {
                 logger.warning("Exception in " + tracker.tasklet, e);
                 tracker.executionTracker.exception(new JetException("Exception in " + tracker.tasklet + ": " + e, e));
