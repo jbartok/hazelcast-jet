@@ -28,12 +28,22 @@ public class JobPrioritiesGui {
     private static final int INITIAL_TOP_Y = 30_000_000;
 
     private final IMap<String, Long> hzMap;
+    private final Color[] colors;
     private UUID entryListenerId;
     private JFrame frame;
 
-    public JobPrioritiesGui(IMap<String, Long> hzMap) {
+    public JobPrioritiesGui(IMap<String, Long> hzMap, int hues) {
         this.hzMap = hzMap;
+        this.colors = getColors(hues);
         EventQueue.invokeLater(this::startGui);
+    }
+
+    private Color[] getColors(int hues) {
+        Color[] colors = new Color[hues];
+        for (int i = 0; i < hues; i++) {
+            colors[i] = new Color(128 - i * 10, 0, 128 + i * 10);
+        }
+        return colors;
     }
 
     private void startGui() {
@@ -46,7 +56,11 @@ public class JobPrioritiesGui {
         long[] topY = {INITIAL_TOP_Y};
         EntryUpdatedListener<String, Long> entryUpdatedListener = event -> {
             EventQueue.invokeLater(() -> {
-                dataset.addValue(event.getValue(), event.getKey(), "");
+                int separatorIndex = event.getKey().indexOf(':');
+                dataset.addValue(event.getValue(),
+                        "",
+                        event.getKey().substring(separatorIndex + 1) + ", prio. " +
+                                event.getKey().substring(0, separatorIndex));
                 topY[0] = max(topY[0], INITIAL_TOP_Y * (1 + event.getValue() / INITIAL_TOP_Y));
                 yAxis.setRange(0, topY[0]);
             });
@@ -57,8 +71,8 @@ public class JobPrioritiesGui {
 
     private JFreeChart createChart(CategoryDataset dataset) {
         return ChartFactory.createBarChart(
-                "Job Results", "Job", "Results", dataset,
-                PlotOrientation.HORIZONTAL, true, true, false);
+                null, null, "Results", dataset,
+                PlotOrientation.HORIZONTAL, false, true, true);
     }
 
     private JFrame createJFrame(JFreeChart chart) {
@@ -83,7 +97,8 @@ public class JobPrioritiesGui {
         plot.setBackgroundPaint(Color.WHITE);
         plot.setDomainGridlinePaint(Color.DARK_GRAY);
         plot.setRangeGridlinePaint(Color.DARK_GRAY);
-        plot.getRenderer().setSeriesPaint(0, Color.BLUE);
+        plot.getRenderer().setSeriesPaint(0, new Color(52, 119, 235));
+
         return plot;
     }
 

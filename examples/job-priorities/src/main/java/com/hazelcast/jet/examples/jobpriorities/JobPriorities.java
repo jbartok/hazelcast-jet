@@ -24,7 +24,6 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 public class JobPriorities {
 
     private static final String RESULT_MAP_NAME = "results-by-job";
-    private static final int DURATION_SECONDS = 15;
 
     public static void main(String[] args) throws Exception {
         try {
@@ -33,19 +32,20 @@ public class JobPriorities {
             JetInstance jet = Jet.newJetInstance(jetConfig);
 
             while (true) {
-                run(jet, 1, 1, 1, 1, 1, 1, 1);
-                run(jet, 1, 1, 1, 1, 2, 3, 4);
-                run(jet, 1, 1, 2, 2, 3, 3, 4);
+                run(jet, 10, 1, 1, 1, 1, 1, 1);
+                run(jet, 10, 1, 1, 1, 1, 1, 2);
+                run(jet, 10, 1, 1, 1, 1, 1, 3);
+                run(jet, 15, 1, 2, 2, 3, 3, 4);
             }
         } finally {
             Jet.shutdownAll();
         }
     }
 
-    private static void run(JetInstance jet, long... priorities) throws InterruptedException {
+    private static void run(JetInstance jet, int durationSeconds, long... priorities) throws InterruptedException {
         IMap<String, Long> map = jet.getMap(RESULT_MAP_NAME);
 
-        JobPrioritiesGui gui = new JobPrioritiesGui(map);
+        JobPrioritiesGui gui = new JobPrioritiesGui(map, priorities.length);
 
         Job[] jobs = new Job[priorities.length];
 
@@ -54,7 +54,7 @@ public class JobPriorities {
             jobs[i] = jet.newJob(buildPipeline(jobName), new JobConfig().setName(jobName));
         }
 
-        SECONDS.sleep(DURATION_SECONDS);
+        SECONDS.sleep(durationSeconds);
 
         gui.stop();
 
