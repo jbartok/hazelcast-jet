@@ -5,13 +5,17 @@ import com.hazelcast.jet.JetInstance;
 import com.hazelcast.jet.Job;
 import com.hazelcast.jet.aggregate.AggregateOperations;
 import com.hazelcast.jet.config.JobConfig;
+import com.hazelcast.jet.core.ProcessorMetaSupplier;
+import com.hazelcast.jet.datamodel.WindowResult;
 import com.hazelcast.jet.pipeline.Pipeline;
 import com.hazelcast.jet.pipeline.Sinks;
-import com.hazelcast.jet.pipeline.test.TestSources;
+import com.hazelcast.jet.pipeline.Sources;
+import com.hazelcast.jet.pipeline.StreamSource;
+import com.hazelcast.jet.pipeline.WindowDefinition;
+import com.hazelcast.jet.pipeline.test.ModifiedLongStreamSourceP;
 
 import java.util.Arrays;
 
-import static com.hazelcast.jet.Util.entry;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 public class JobPriorities {
@@ -47,14 +51,20 @@ public class JobPriorities {
 
     private static Pipeline buildPipeline(String jobName) {
         Pipeline p = Pipeline.create();
-        p.readFrom(TestSources.itemStream(2_000))
-                .withIngestionTimestamps()
-                .rollingAggregate(AggregateOperations.counting())
+        p.readFrom(modifiedLongStream())
+                .withNativeTimestamps(0)
                 .setLocalParallelism(2)
-                .map(count -> entry(jobName, count))
-                .setLocalParallelism(2)
-                .writeTo(Sinks.map(RESULT_MAP_NAME));
+                .window(WindowDefinition.tumbling(250))
+                .aggregate(AggregateOperations.counting())
+                .writeTo(Sinks.mapWithMerging(RESULT_MAP_NAME, result -> jobName, WindowResult::result, Long::sum));
         return p;
+    }
+
+    public static StreamSource<Long> modifiedLongStream() {
+        return Sources.streamFromProcessorWithWatermarks("longStream",
+                true,
+                eventTimePolicy -> ProcessorMetaSupplier.of(() -> new ModifiedLongStreamSourceP(eventTimePolicy))
+        );
     }
 
 }
