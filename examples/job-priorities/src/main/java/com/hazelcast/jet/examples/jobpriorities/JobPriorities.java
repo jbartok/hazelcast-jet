@@ -33,9 +33,9 @@ public class JobPriorities {
 
             while (true) {
                 run(jet, 10, 1, 1, 1, 1, 1, 1);
-                run(jet, 10, 1, 1, 1, 1, 1, 2);
-                run(jet, 10, 1, 1, 1, 1, 1, 3);
-                run(jet, 15, 1, 2, 2, 3, 3, 4);
+                run(jet, 15, 1, 1, 1, 1, 1, 2);
+                run(jet, 15, 1, 1, 1, 1, 1, 3);
+                run(jet, 20, 1, 2, 2, 3, 3, 4);
             }
         } finally {
             Jet.shutdownAll();
@@ -89,7 +89,7 @@ public class JobPriorities {
     }
 
     public static String jobName(int index, int priority) {
-        return "job" + index + " [ " + priority + " ]";
+        return "job" + index + "   " + priority;
     }
 
 }
