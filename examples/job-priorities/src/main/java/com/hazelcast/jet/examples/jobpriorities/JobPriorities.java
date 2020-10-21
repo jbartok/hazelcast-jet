@@ -42,16 +42,17 @@ public class JobPriorities {
         }
     }
 
-    private static void run(JetInstance jet, int durationSeconds, long... priorities) throws InterruptedException {
+    private static void run(JetInstance jet, int durationSeconds, int... priorities) throws InterruptedException {
         IMap<String, Long> map = jet.getMap(RESULT_MAP_NAME);
 
-        JobPrioritiesGui gui = new JobPrioritiesGui(map, priorities.length);
+        JobPrioritiesGui gui = new JobPrioritiesGui(map, priorities);
 
         Job[] jobs = new Job[priorities.length];
 
         for (int i = 0; i < priorities.length; i++) {
-            String jobName = priorities[i] + ":job" + i;
-            jobs[i] = jet.newJob(buildPipeline(jobName), new JobConfig().setName(jobName));
+            int priority = priorities[i];
+            String jobName = jobName(i, priority);
+            jobs[i] = jet.newJob(buildPipeline(jobName), new JobConfig().setName(jobName).setPriority(priority));
         }
 
         SECONDS.sleep(durationSeconds);
@@ -85,6 +86,10 @@ public class JobPriorities {
                 true,
                 eventTimePolicy -> ProcessorMetaSupplier.of(() -> new ModifiedLongStreamSourceP(eventTimePolicy))
         );
+    }
+
+    public static String jobName(int index, int priority) {
+        return "job" + index + " [ " + priority + " ]";
     }
 
 }

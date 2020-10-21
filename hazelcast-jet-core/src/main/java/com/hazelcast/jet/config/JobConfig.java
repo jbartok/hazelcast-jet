@@ -68,6 +68,7 @@ public class JobConfig implements IdentifiedDataSerializable {
     private boolean splitBrainProtectionEnabled;
     private boolean enableMetrics = true;
     private boolean storeMetricsAfterJobCompletion;
+    private int priority = 1;
 
     private Map<String, ResourceConfig> resourceConfigs = new LinkedHashMap<>();
     private Map<String, String> serializerConfigs = new HashMap<>();
@@ -252,6 +253,17 @@ public class JobConfig implements IdentifiedDataSerializable {
     public JobConfig setSnapshotIntervalMillis(long snapshotInterval) {
         Preconditions.checkNotNegative(snapshotInterval, "snapshotInterval can't be negative");
         this.snapshotIntervalMillis = snapshotInterval;
+        return this;
+    }
+
+    @Nonnull
+    public int getPriority() {
+        return priority;
+    }
+
+    @Nonnull
+    public JobConfig setPriority(int priority) {
+        this.priority = Preconditions.checkPositive(priority, "Priority should be positive");
         return this;
     }
 
@@ -1141,6 +1153,7 @@ public class JobConfig implements IdentifiedDataSerializable {
         out.writeUTF(initialSnapshotName);
         out.writeBoolean(enableMetrics);
         out.writeBoolean(storeMetricsAfterJobCompletion);
+        out.writeInt(priority);
     }
 
     @Override
@@ -1157,6 +1170,7 @@ public class JobConfig implements IdentifiedDataSerializable {
         initialSnapshotName = in.readUTF();
         enableMetrics = in.readBoolean();
         storeMetricsAfterJobCompletion = in.readBoolean();
+        priority = in.readInt();
     }
 
     @Override

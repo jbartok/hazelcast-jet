@@ -101,7 +101,6 @@ public class ExecutionContext implements DynamicMetricsProvider {
     private final TaskletExecutionService taskletExecService;
     private SnapshotContext snapshotContext;
     private JobConfig jobConfig;
-    private int jobPriority;
 
     private boolean metricsEnabled;
     private volatile RawJobMetrics jobMetrics = RawJobMetrics.empty();
@@ -125,7 +124,6 @@ public class ExecutionContext implements DynamicMetricsProvider {
     public ExecutionContext initialize(ExecutionPlan plan) {
         jobConfig = plan.getJobConfig();
         jobName = jobConfig.getName() == null ? jobName : jobConfig.getName();
-        jobPriority = getPriority(jobName);
 
         // Must be populated early, so all processor suppliers are
         // available to be completed in the case of init failure
@@ -147,20 +145,6 @@ public class ExecutionContext implements DynamicMetricsProvider {
         return this;
     }
 
-    private static int getPriority(String jobName) {
-        if (jobName.contains(":")) {
-            try {
-                int priority = Integer.parseInt(jobName.substring(0, jobName.indexOf(':')));
-                if (priority > 0) {
-                    return priority;
-                }
-            } catch (NumberFormatException e) {
-                e.printStackTrace();
-            }
-        }
-        return 1;
-    }
-
     /**
      * Starts local execution of job by submitting tasklets to execution service. If
      * execution was cancelled earlier then execution will not be started.
@@ -180,7 +164,7 @@ public class ExecutionContext implements DynamicMetricsProvider {
                 JetService service = nodeEngine.getService(JetService.SERVICE_NAME);
                 ClassLoader cl = service.getJobExecutionService().getClassLoader(jobConfig, jobId);
                 executionFuture = taskletExecService
-                        .beginExecute(jobPriority, tasklets, cancellationFuture, cl)
+                        .beginExecute(jobConfig.getPriority(), tasklets, cancellationFuture, cl)
                         .thenApply(res -> {
                             // There's a race here: a snapshot could be requested after the job just completed
                             // normally, in that case we'll report that it terminated with snapshot.

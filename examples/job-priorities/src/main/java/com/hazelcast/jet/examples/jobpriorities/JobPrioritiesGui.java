@@ -8,6 +8,7 @@ import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.ValueAxis;
 import org.jfree.chart.plot.CategoryPlot;
 import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.chart.renderer.category.BarRenderer;
 import org.jfree.data.category.CategoryDataset;
 import org.jfree.data.category.DefaultCategoryDataset;
 
@@ -29,12 +30,14 @@ public class JobPrioritiesGui {
 
     private final IMap<String, Long> hzMap;
     private final Color[] colors;
+    private final int[] priorities;
     private UUID entryListenerId;
     private JFrame frame;
 
-    public JobPrioritiesGui(IMap<String, Long> hzMap, int hues) {
+    public JobPrioritiesGui(IMap<String, Long> hzMap, int... priorities) {
         this.hzMap = hzMap;
-        this.colors = getColors(hues);
+        this.colors = getColors(priorities.length);
+        this.priorities = priorities;
         EventQueue.invokeLater(this::startGui);
     }
 
@@ -56,16 +59,17 @@ public class JobPrioritiesGui {
         long[] topY = {INITIAL_TOP_Y};
         EntryUpdatedListener<String, Long> entryUpdatedListener = event -> {
             EventQueue.invokeLater(() -> {
-                int separatorIndex = event.getKey().indexOf(':');
                 dataset.addValue(event.getValue(),
                         "",
-                        event.getKey().substring(separatorIndex + 1) + ", prio. " +
-                                event.getKey().substring(0, separatorIndex));
+                        event.getKey());
                 topY[0] = max(topY[0], INITIAL_TOP_Y * (1 + event.getValue() / INITIAL_TOP_Y));
                 yAxis.setRange(0, topY[0]);
             });
         };
-
+        for (int i = 0; i < priorities.length; i++) {
+            String jobName = JobPriorities.jobName(i, priorities[i]);
+            dataset.addValue(0, "", jobName);
+        }
         entryListenerId = hzMap.addEntryListener(entryUpdatedListener, true);
     }
 
@@ -97,8 +101,9 @@ public class JobPrioritiesGui {
         plot.setBackgroundPaint(Color.WHITE);
         plot.setDomainGridlinePaint(Color.DARK_GRAY);
         plot.setRangeGridlinePaint(Color.DARK_GRAY);
-        plot.getRenderer().setSeriesPaint(0, new Color(52, 119, 235));
-
+        CustomBarRenderer renderer = new CustomBarRenderer(colors);
+        renderer.setSeriesPaint(0, new Color(52, 119, 235));
+        plot.setRenderer(renderer);
         return plot;
     }
 
@@ -106,4 +111,22 @@ public class JobPrioritiesGui {
         frame.setVisible(false);
         frame.dispose();
     }
+
+    static class CustomBarRenderer extends BarRenderer {
+
+        Color[] colors;
+
+        public CustomBarRenderer(Color[] colors) {
+            this.colors = colors;
+        }
+
+        @Override
+        public Paint getItemPaint(int row, int column) {
+            if (column < colors.length) {
+                return colors[column];
+            }
+            return super.getItemPaint(row, column);
+        }
+    }
+
 }
