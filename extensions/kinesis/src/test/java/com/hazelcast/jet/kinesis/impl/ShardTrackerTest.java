@@ -15,9 +15,9 @@
  */
 package com.hazelcast.jet.kinesis.impl;
 
-import com.amazonaws.services.kinesis.model.HashKeyRange;
-import com.amazonaws.services.kinesis.model.Shard;
 import org.junit.Test;
+import software.amazon.awssdk.services.kinesis.model.HashKeyRange;
+import software.amazon.awssdk.services.kinesis.model.Shard;
 
 import java.math.BigInteger;
 import java.util.Arrays;
@@ -94,7 +94,7 @@ public class ShardTrackerTest {
     }
 
     private void addUndetected(Shard shard, long timeMs) {
-        tracker.addUndetected(shard.getShardId(), new BigInteger(shard.getHashKeyRange().getStartingHashKey()), timeMs);
+        tracker.addUndetected(shard.shardId(), new BigInteger(shard.hashKeyRange().startingHashKey()), timeMs);
     }
 
     private static Set<Shard> set(Shard... shards) {
@@ -102,10 +102,11 @@ public class ShardTrackerTest {
     }
 
     private static Shard shard(String id, long startHashKey, long endHashKey) {
-        HashKeyRange hashKeyRange = new HashKeyRange()
-                .withStartingHashKey(Long.toString(startHashKey))
-                .withEndingHashKey(Long.toString(endHashKey));
-        return new Shard().withShardId(id).withHashKeyRange(hashKeyRange);
+        HashKeyRange hashKeyRange = HashKeyRange.builder()
+                .startingHashKey(Long.toString(startHashKey))
+                .endingHashKey(Long.toString(endHashKey))
+                .build();
+        return Shard.builder().shardId(id).hashKeyRange(hashKeyRange).build();
     }
 
     private static Map<Shard, Integer> expectedNew(Object... values) {
@@ -123,7 +124,7 @@ public class ShardTrackerTest {
         for (int i = 0; i < values.length; i += 2) {
             Shard shard = (Shard) values[i];
             Integer owner = (Integer) values[i + 1];
-            retMap.put(shard.getShardId(), owner);
+            retMap.put(shard.shardId(), owner);
         }
         return retMap;
     }

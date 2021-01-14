@@ -15,12 +15,12 @@
  */
 package com.hazelcast.jet.kinesis.impl;
 
-import com.amazonaws.SdkClientException;
-import com.amazonaws.services.kinesis.AmazonKinesisAsync;
-import com.amazonaws.services.kinesis.model.ListShardsResult;
-import com.amazonaws.services.kinesis.model.Shard;
 import com.hazelcast.jet.retry.RetryStrategy;
 import com.hazelcast.logging.ILogger;
+import software.amazon.awssdk.core.exception.SdkClientException;
+import software.amazon.awssdk.services.kinesis.KinesisAsyncClient;
+import software.amazon.awssdk.services.kinesis.model.ListShardsResponse;
+import software.amazon.awssdk.services.kinesis.model.Shard;
 
 import javax.annotation.Nonnull;
 import java.math.BigInteger;
@@ -53,12 +53,12 @@ public class RangeMonitor extends AbstractShardWorker {
     private final RetryTracker listShardRetryTracker;
 
     private String nextToken;
-    private Future<ListShardsResult> listShardsResult;
+    private Future<ListShardsResponse> listShardsResponse;
     private long nextListShardsTimeMs;
 
     public RangeMonitor(
             int totalInstances,
-            AmazonKinesisAsync kinesis,
+            KinesisAsyncClient client,
             String stream,
             HashRange memberHashRange,
             HashRange[] rangePartitions,
@@ -66,7 +66,7 @@ public class RangeMonitor extends AbstractShardWorker {
             RetryStrategy retryStrategy,
             ILogger logger
     ) {
-        super(kinesis, stream, logger);
+        super(client, stream, logger);
         this.memberHashRange = memberHashRange;
         this.shardTracker = new ShardTracker(rangePartitions);
         this.shardQueues = shardQueues;
@@ -77,27 +77,27 @@ public class RangeMonitor extends AbstractShardWorker {
 
     public void run() {
         long currentTimeMs = System.currentTimeMillis();
-        if (listShardsResult == null) {
+        if (listShardsResponse == null) {
             initShardListing(currentTimeMs);
         } else {
-            if (listShardsResult.isDone()) {
-                ListShardsResult result;
+            if (listShardsResponse.isDone()) {
+                ListShardsResponse response;
                 try {
-                    result = helper.readResult(listShardsResult);
+                    response = helper.readResult(listShardsResponse);
                 } catch (SdkClientException e) {
                     dealWithListShardsFailure(e);
                     return;
                 } catch (Throwable t) {
                     throw rethrow(t);
                 } finally {
-                    listShardsResult = null;
+                    listShardsResponse = null;
                 }
 
                 listShardRetryTracker.reset();
 
-                checkForNewShards(currentTimeMs, result);
+                checkForNewShards(currentTimeMs, response);
 
-                nextToken = result.getNextToken();
+                nextToken = response.nextToken();
                 if (nextToken == null) {
                     checkForExpiredShards(currentTimeMs);
                 }
@@ -109,19 +109,19 @@ public class RangeMonitor extends AbstractShardWorker {
         if (currentTimeMs < nextListShardsTimeMs) {
             return;
         }
-        listShardsResult = helper.listAllShardsAsync(nextToken);
+        listShardsResponse = helper.listAllShardsAsync(nextToken);
         nextListShardsTimeMs = currentTimeMs + listShardsRateTracker.next();
     }
 
-    private void checkForNewShards(long currentTimeMs, ListShardsResult result) {
-        Set<Shard> shards = result.getShards().stream()
+    private void checkForNewShards(long currentTimeMs, ListShardsResponse response) {
+        Set<Shard> shards = response.shards().stream()
                 .filter(shard -> shardBelongsToRange(shard, memberHashRange))
                 .collect(Collectors.toSet());
         Map<Shard, Integer> newShards = shardTracker.markDetections(shards, currentTimeMs);
 
         if (!newShards.isEmpty()) {
             logger.info("New shards detected: " +
-                    newShards.keySet().stream().map(Shard::getShardId).collect(joining(", ")));
+                    newShards.keySet().stream().map(Shard::shardId).collect(joining(", ")));
 
             for (Map.Entry<Shard, Integer> e : newShards.entrySet()) {
                 Shard shard = e.getKey();

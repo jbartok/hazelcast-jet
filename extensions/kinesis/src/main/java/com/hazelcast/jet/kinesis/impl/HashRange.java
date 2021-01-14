@@ -15,7 +15,7 @@
  */
 package com.hazelcast.jet.kinesis.impl;
 
-import com.amazonaws.services.kinesis.model.HashKeyRange;
+import software.amazon.awssdk.services.kinesis.model.HashKeyRange;
 
 import javax.annotation.Nonnull;
 import java.io.Serializable;
@@ -53,8 +53,8 @@ public class HashRange implements Serializable {
     }
 
     public static HashRange range(@Nonnull HashKeyRange hashKeyRange) {
-        BigInteger startInclusive = new BigInteger(hashKeyRange.getStartingHashKey());
-        BigInteger endExclusive = new BigInteger(hashKeyRange.getEndingHashKey()).add(BigInteger.ONE);
+        BigInteger startInclusive = new BigInteger(hashKeyRange.startingHashKey());
+        BigInteger endExclusive = new BigInteger(hashKeyRange.endingHashKey()).add(BigInteger.ONE);
         return new HashRange(startInclusive, endExclusive);
     }
 

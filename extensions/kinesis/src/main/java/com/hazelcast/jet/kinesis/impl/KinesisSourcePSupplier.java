@@ -15,12 +15,12 @@
  */
 package com.hazelcast.jet.kinesis.impl;
 
-import com.amazonaws.services.kinesis.AmazonKinesisAsync;
 import com.hazelcast.jet.core.EventTimePolicy;
 import com.hazelcast.jet.core.Processor;
 import com.hazelcast.jet.core.ProcessorSupplier;
 import com.hazelcast.jet.retry.RetryStrategy;
 import com.hazelcast.logging.ILogger;
+import software.amazon.awssdk.services.kinesis.KinesisAsyncClient;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -50,7 +50,7 @@ public class KinesisSourcePSupplier implements ProcessorSupplier {
 
     private transient int memberCount;
     private transient ILogger logger;
-    private transient AmazonKinesisAsync client;
+    private transient KinesisAsyncClient client;
 
     public KinesisSourcePSupplier(
             @Nonnull AwsConfig awsConfig,
@@ -72,7 +72,7 @@ public class KinesisSourcePSupplier implements ProcessorSupplier {
     public void init(@Nonnull Context context) {
         memberCount = context.memberCount();
         logger = context.logger();
-        client = awsConfig.buildClient();
+        client = awsConfig.buildAsyncClient();
     }
 
     @Nonnull
@@ -122,7 +122,7 @@ public class KinesisSourcePSupplier implements ProcessorSupplier {
     @Override
     public void close(@Nullable Throwable error) {
         if (client != null) {
-            client.shutdown();
+            client.close();
         }
     }
 }

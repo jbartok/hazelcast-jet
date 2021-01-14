@@ -15,8 +15,6 @@
  */
 package com.hazelcast.jet.kinesis;
 
-import com.amazonaws.SDKGlobalConfiguration;
-import com.amazonaws.services.kinesis.AmazonKinesisAsync;
 import com.hazelcast.jet.JetException;
 import com.hazelcast.jet.Job;
 import com.hazelcast.jet.core.JobStatus;
@@ -39,6 +37,8 @@ import org.testcontainers.containers.ToxiproxyContainer;
 import org.testcontainers.containers.ToxiproxyContainer.ContainerProxy;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.containers.localstack.LocalStackContainer.Service;
+import software.amazon.awssdk.core.SdkSystemSetting;
+import software.amazon.awssdk.services.kinesis.KinesisClient;
 
 import java.util.List;
 import java.util.Map;
@@ -74,18 +74,18 @@ public class KinesisFailureTest extends AbstractKinesisTest {
             .withNetworkAliases("toxiproxy");
 
     private static AwsConfig AWS_CONFIG;
-    private static AmazonKinesisAsync KINESIS;
+    private static KinesisClient CLIENT;
     private static ContainerProxy PROXY;
     private static KinesisTestHelper HELPER;
 
     public KinesisFailureTest() {
-        super(AWS_CONFIG, KINESIS, HELPER);
+        super(AWS_CONFIG, CLIENT, HELPER);
     }
 
     @BeforeClass
     public static void beforeClass() {
-        System.setProperty(SDKGlobalConfiguration.AWS_CBOR_DISABLE_SYSTEM_PROPERTY, "true");
-        // with the jackson versions we use (2.11.x) Localstack doesn't without disabling CBOR
+        System.setProperty(SdkSystemSetting.CBOR_ENABLED.property(), "false");
+        // with the jackson versions we use (2.11.x) Localstack doesn't work without disabling CBOR
         // https://github.com/localstack/localstack/issues/3208
 
         PROXY = TOXIPROXY.getProxy(LOCALSTACK, 4566);
@@ -94,13 +94,13 @@ public class KinesisFailureTest extends AbstractKinesisTest {
                 .withEndpoint("http://" + PROXY.getContainerIpAddress() + ":" + PROXY.getProxyPort())
                 .withRegion(LOCALSTACK.getRegion())
                 .withCredentials(LOCALSTACK.getAccessKey(), LOCALSTACK.getSecretKey());
-        KINESIS = AWS_CONFIG.buildClient();
-        HELPER = new KinesisTestHelper(KINESIS, STREAM, Logger.getLogger(KinesisIntegrationTest.class));
+        CLIENT = AWS_CONFIG.buildSyncClient();
+        HELPER = new KinesisTestHelper(CLIENT, STREAM, Logger.getLogger(KinesisIntegrationTest.class));
     }
 
     @AfterClass
     public static void afterClass() {
-        KINESIS.shutdown();
+        CLIENT.close();
     }
 
     @Test

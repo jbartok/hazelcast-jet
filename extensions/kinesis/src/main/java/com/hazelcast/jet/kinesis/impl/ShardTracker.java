@@ -15,8 +15,8 @@
  */
 package com.hazelcast.jet.kinesis.impl;
 
-import com.amazonaws.services.kinesis.model.Shard;
 import com.hazelcast.jet.JetException;
+import software.amazon.awssdk.services.kinesis.model.Shard;
 
 import java.math.BigInteger;
 import java.util.Collections;
@@ -50,10 +50,10 @@ public class ShardTracker {
     public Map<Shard, Integer> markDetections(Set<Shard> shards, long currentTimeMs) {
         Map<Shard, Integer> newShards = Collections.emptyMap();
         for (Shard shard : shards) {
-            String shardId = shard.getShardId();
+            String shardId = shard.shardId();
             TrackingInfo trackingInfo = info.get(shardId);
             if (trackingInfo == null) {
-                int owner = findOwner(new BigInteger(shard.getHashKeyRange().getStartingHashKey()));
+                int owner = findOwner(new BigInteger(shard.hashKeyRange().startingHashKey()));
                 trackingInfo = new TrackingInfo(owner, currentTimeMs);
                 info.put(shardId, trackingInfo);
             }

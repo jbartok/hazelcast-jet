@@ -15,10 +15,6 @@
  */
 package com.hazelcast.jet.kinesis;
 
-import com.amazonaws.services.kinesis.AmazonKinesisAsync;
-import com.amazonaws.services.kinesis.model.MergeShardsRequest;
-import com.amazonaws.services.kinesis.model.Shard;
-import com.amazonaws.services.kinesis.model.SplitShardRequest;
 import com.hazelcast.jet.JetInstance;
 import com.hazelcast.jet.core.JetTestSupport;
 import com.hazelcast.jet.datamodel.Tuple2;
@@ -35,6 +31,10 @@ import com.hazelcast.jet.retry.RetryStrategies;
 import com.hazelcast.map.IMap;
 import org.junit.After;
 import org.junit.Before;
+import software.amazon.awssdk.services.kinesis.KinesisClient;
+import software.amazon.awssdk.services.kinesis.model.MergeShardsRequest;
+import software.amazon.awssdk.services.kinesis.model.Shard;
+import software.amazon.awssdk.services.kinesis.model.SplitShardRequest;
 
 import javax.annotation.Nonnull;
 import java.math.BigInteger;
@@ -63,14 +63,14 @@ class AbstractKinesisTest extends JetTestSupport {
     protected IMap<String, List<String>> results;
 
     private final AwsConfig awsConfig;
-    private final AmazonKinesisAsync kinesis;
+    private final KinesisClient client;
     private final KinesisTestHelper helper;
 
     private JetInstance[] cluster;
 
-    AbstractKinesisTest(AwsConfig awsConfig, AmazonKinesisAsync kinesis, KinesisTestHelper helper) {
+    AbstractKinesisTest(AwsConfig awsConfig, KinesisClient client, KinesisTestHelper helper) {
         this.awsConfig = awsConfig;
-        this.kinesis = kinesis;
+        this.client = client;
         this.helper = helper;
     }
 
@@ -190,32 +190,34 @@ class AbstractKinesisTest extends JetTestSupport {
     }
 
     protected void mergeShards(Shard shard1, Shard shard2) {
-        MergeShardsRequest request = new MergeShardsRequest();
-        request.setStreamName(STREAM);
-        request.setShardToMerge(shard1.getShardId());
-        request.setAdjacentShardToMerge(shard2.getShardId());
+        MergeShardsRequest request = MergeShardsRequest.builder()
+                .streamName(STREAM)
+                .shardToMerge(shard1.shardId())
+                .adjacentShardToMerge(shard2.shardId())
+                .build();
 
-        System.out.println("Merging " + shard1.getShardId() + " with " + shard2.getShardId());
-        kinesis.mergeShards(request);
+        System.out.println("Merging " + shard1.shardId() + " with " + shard2.shardId());
+        client.mergeShards(request);
     }
 
     protected void splitShard(Shard shard) {
-        HashRange range = HashRange.range(shard.getHashKeyRange());
+        HashRange range = HashRange.range(shard.hashKeyRange());
         BigInteger middle = range.getMinInclusive().add(range.getMaxExclusive()).divide(BigInteger.valueOf(2));
 
-        SplitShardRequest request = new SplitShardRequest();
-        request.setStreamName(STREAM);
-        request.setShardToSplit(shard.getShardId());
-        request.setNewStartingHashKey(middle.toString());
+        SplitShardRequest request = SplitShardRequest.builder()
+                .streamName(STREAM)
+                .shardToSplit(shard.shardId())
+                .newStartingHashKey(middle.toString())
+                .build();
 
-        System.out.println("Splitting " + shard.getShardId());
-        kinesis.splitShard(request);
+        System.out.println("Splitting " + shard.shardId());
+        client.splitShard(request);
     }
 
     protected static Tuple2<Shard, Shard> findAdjacentPair(Shard shard, List<Shard> allShards) {
-        HashRange shardRange = HashRange.range(shard.getHashKeyRange());
+        HashRange shardRange = HashRange.range(shard.hashKeyRange());
         for (Shard examinedShard : allShards) {
-            HashRange examinedRange = HashRange.range(examinedShard.getHashKeyRange());
+            HashRange examinedRange = HashRange.range(examinedShard.hashKeyRange());
             if (shardRange.isAdjacent(examinedRange)) {
                 if (shardRange.getMinInclusive().compareTo(examinedRange.getMinInclusive()) <= 0) {
                     return Tuple2.tuple2(shard, examinedShard);

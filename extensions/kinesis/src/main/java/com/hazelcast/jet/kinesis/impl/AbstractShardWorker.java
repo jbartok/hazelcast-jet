@@ -15,8 +15,8 @@
  */
 package com.hazelcast.jet.kinesis.impl;
 
-import com.amazonaws.services.kinesis.AmazonKinesisAsync;
 import com.hazelcast.logging.ILogger;
+import software.amazon.awssdk.services.kinesis.KinesisAsyncClient;
 
 abstract class AbstractShardWorker {
 
@@ -24,8 +24,8 @@ abstract class AbstractShardWorker {
     protected final String stream;
     protected final ILogger logger;
 
-    AbstractShardWorker(AmazonKinesisAsync kinesis, String stream, ILogger logger) {
-        this.helper = new KinesisHelper(kinesis, stream);
+    AbstractShardWorker(KinesisAsyncClient client, String stream, ILogger logger) {
+        this.helper = new KinesisHelper(client, stream);
         this.stream = stream;
         this.logger = logger;
     }

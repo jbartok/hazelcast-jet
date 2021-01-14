@@ -15,8 +15,6 @@
  */
 package com.hazelcast.jet.kinesis.impl;
 
-import com.amazonaws.services.kinesis.AmazonKinesisAsync;
-import com.amazonaws.services.kinesis.model.Shard;
 import com.hazelcast.internal.metrics.DynamicMetricsProvider;
 import com.hazelcast.internal.metrics.MetricDescriptor;
 import com.hazelcast.internal.metrics.MetricsCollectionContext;
@@ -32,14 +30,15 @@ import com.hazelcast.logging.ILogger;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.IdentifiedDataSerializable;
+import software.amazon.awssdk.services.kinesis.KinesisAsyncClient;
+import software.amazon.awssdk.services.kinesis.model.Record;
+import software.amazon.awssdk.services.kinesis.model.Shard;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,7 +56,7 @@ import static com.hazelcast.jet.kinesis.impl.KinesisHelper.shardBelongsToRange;
 public class KinesisSourceP extends AbstractProcessor implements DynamicMetricsProvider {
 
     @Nonnull
-    private final AmazonKinesisAsync kinesis;
+    private final KinesisAsyncClient client;
     @Nonnull
     private final String stream;
     @Nonnull
@@ -88,7 +87,7 @@ public class KinesisSourceP extends AbstractProcessor implements DynamicMetricsP
     private int nextReader;
 
     public KinesisSourceP(
-            @Nonnull AmazonKinesisAsync kinesis,
+            @Nonnull KinesisAsyncClient client,
             @Nonnull String stream,
             @Nonnull EventTimePolicy<? super Entry<String, byte[]>> eventTimePolicy,
             @Nonnull HashRange memberHashRange,
@@ -98,7 +97,7 @@ public class KinesisSourceP extends AbstractProcessor implements DynamicMetricsP
             @Nonnull RetryStrategy retryStrategy,
             @Nonnull InitialShardIterators initialShardIterators
             ) {
-        this.kinesis = Objects.requireNonNull(kinesis, "kinesis");
+        this.client = Objects.requireNonNull(client, "client");
         this.stream = Objects.requireNonNull(stream, "stream");
         this.eventTimeMapper = new EventTimeMapper<>(eventTimePolicy);
         this.memberHashRange = Objects.requireNonNull(memberHashRange, "memberHashRange");
@@ -164,9 +163,9 @@ public class KinesisSourceP extends AbstractProcessor implements DynamicMetricsP
                 if (ShardReader.Result.HAS_DATA.equals(result)) {
                     traverser = reader.clearData()
                             .flatMap(record -> eventTimeMapper.flatMapEvent(
-                                    entry(record.getPartitionKey(), toArray(record)),
+                                    entry(record.partitionKey(), toArray(record)),
                                     currentReader,
-                                    record.getApproximateArrivalTimestamp().getTime()
+                                    record.approximateArrivalTimestamp().toEpochMilli()
                             ));
                     Long watermark = eventTimeMapper.getWatermark(currentReader);
                     watermark = watermark < 0 ? null : watermark;
@@ -175,7 +174,7 @@ public class KinesisSourceP extends AbstractProcessor implements DynamicMetricsP
                     return;
                 } else if (ShardReader.Result.CLOSED.equals(result)) {
                     Shard shard = reader.getShard();
-                    logger.info("Shard " + shard.getShardId() + " of stream " + stream + " closed");
+                    logger.info("Shard " + shard.shardId() + " of stream " + stream + " closed");
                     shardStates.close(shard);
                     nextReader = 0;
                     traverser = removeShardReader(currentReader);
@@ -227,7 +226,7 @@ public class KinesisSourceP extends AbstractProcessor implements DynamicMetricsP
     }
 
     private void addShardReader(Shard shard) {
-        String shardId = shard.getShardId();
+        String shardId = shard.shardId();
         ShardState shardState = shardStates.get(shardId);
         if (!shardState.isClosed()) {
             int readerIndex = shardReaders.size();
@@ -251,8 +250,8 @@ public class KinesisSourceP extends AbstractProcessor implements DynamicMetricsP
 
     @Nonnull
     private ShardReader initShardReader(Shard shard, String lastSeenSeqNo) {
-        logger.info("Shard " + shard.getShardId() + " of stream " + stream + " assigned to processor instance " + id);
-        return new ShardReader(kinesis, stream, shard, lastSeenSeqNo, retryStrategy, initialShardIterators, logger);
+        logger.info("Shard " + shard.shardId() + " of stream " + stream + " assigned to processor instance " + id);
+        return new ShardReader(client, stream, shard, lastSeenSeqNo, retryStrategy, initialShardIterators, logger);
     }
 
     @Override
@@ -262,15 +261,8 @@ public class KinesisSourceP extends AbstractProcessor implements DynamicMetricsP
         }
     }
 
-    private static byte[] toArray(com.amazonaws.services.kinesis.model.Record record) {
-        ByteBuffer buffer = record.getData();
-        int position = buffer.position();
-        int limit = buffer.limit();
-        if (position == 0 && limit == buffer.capacity()) {
-            return buffer.array();
-        } else {
-            return Arrays.copyOfRange(buffer.array(), position, limit);
-        }
+    private static byte[] toArray(Record record) {
+        return record.data().asByteArray();
     }
 
     private static int incrementCircular(int v, int limit) {
@@ -286,13 +278,13 @@ public class KinesisSourceP extends AbstractProcessor implements DynamicMetricsP
         private final Map<String, ShardState> states = new HashMap<>();
 
         void update(Shard shard, String seqNo, Long watermark) {
-            BigInteger startingHashKey = new BigInteger(shard.getHashKeyRange().getStartingHashKey());
-            update(shard.getShardId(), startingHashKey, false, seqNo, watermark);
+            BigInteger startingHashKey = new BigInteger(shard.hashKeyRange().startingHashKey());
+            update(shard.shardId(), startingHashKey, false, seqNo, watermark);
         }
 
         void close(Shard shard) {
-            BigInteger startingHashKey = new BigInteger(shard.getHashKeyRange().getStartingHashKey());
-            update(shard.getShardId(), startingHashKey, true, null, null);
+            BigInteger startingHashKey = new BigInteger(shard.hashKeyRange().startingHashKey());
+            update(shard.shardId(), startingHashKey, true, null, null);
         }
 
         void update(String shardId, BigInteger startingHashKey, boolean closed, String lastSeenSeqNo, Long watermark) {

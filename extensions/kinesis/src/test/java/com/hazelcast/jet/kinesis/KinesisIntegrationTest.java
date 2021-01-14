@@ -15,10 +15,6 @@
  */
 package com.hazelcast.jet.kinesis;
 
-import com.amazonaws.SDKGlobalConfiguration;
-import com.amazonaws.services.kinesis.AmazonKinesisAsync;
-import com.amazonaws.services.kinesis.model.PutRecordsResult;
-import com.amazonaws.services.kinesis.model.Shard;
 import com.hazelcast.jet.JetException;
 import com.hazelcast.jet.Job;
 import com.hazelcast.jet.config.JobConfig;
@@ -38,12 +34,15 @@ import com.hazelcast.test.annotation.NightlyTest;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.containers.localstack.LocalStackContainer.Service;
+import software.amazon.awssdk.core.SdkSystemSetting;
+import software.amazon.awssdk.services.kinesis.KinesisClient;
+import software.amazon.awssdk.services.kinesis.model.PutRecordsResponse;
+import software.amazon.awssdk.services.kinesis.model.Shard;
 
 import java.util.Collections;
 import java.util.List;
@@ -52,11 +51,6 @@ import java.util.Set;
 import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
-import static com.amazonaws.services.kinesis.model.ShardIteratorType.AFTER_SEQUENCE_NUMBER;
-import static com.amazonaws.services.kinesis.model.ShardIteratorType.AT_SEQUENCE_NUMBER;
-import static com.amazonaws.services.kinesis.model.ShardIteratorType.AT_TIMESTAMP;
-import static com.amazonaws.services.kinesis.model.ShardIteratorType.LATEST;
-import static com.amazonaws.services.kinesis.model.ShardIteratorType.TRIM_HORIZON;
 import static com.hazelcast.jet.aggregate.AggregateOperations.counting;
 import static com.hazelcast.jet.impl.util.ExceptionUtil.peel;
 import static com.hazelcast.jet.pipeline.test.Assertions.assertCollectedEventually;
@@ -66,6 +60,11 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.testcontainers.utility.DockerImageName.parse;
+import static software.amazon.awssdk.services.kinesis.model.ShardIteratorType.AFTER_SEQUENCE_NUMBER;
+import static software.amazon.awssdk.services.kinesis.model.ShardIteratorType.AT_SEQUENCE_NUMBER;
+import static software.amazon.awssdk.services.kinesis.model.ShardIteratorType.AT_TIMESTAMP;
+import static software.amazon.awssdk.services.kinesis.model.ShardIteratorType.LATEST;
+import static software.amazon.awssdk.services.kinesis.model.ShardIteratorType.TRIM_HORIZON;
 
 @RunWith(HazelcastSerialClassRunner.class)
 public class KinesisIntegrationTest extends AbstractKinesisTest {
@@ -76,12 +75,12 @@ public class KinesisIntegrationTest extends AbstractKinesisTest {
             .withServices(Service.KINESIS);
 
     private static AwsConfig AWS_CONFIG;
-    private static AmazonKinesisAsync KINESIS;
+    private static KinesisClient CLIENT;
     private static KinesisTestHelper HELPER;
     private static boolean useRealKinesis;
 
     public KinesisIntegrationTest() {
-        super(AWS_CONFIG, KINESIS, HELPER);
+        super(AWS_CONFIG, CLIENT, HELPER);
     }
 
     @BeforeClass
@@ -92,8 +91,8 @@ public class KinesisIntegrationTest extends AbstractKinesisTest {
         // run it you should ensure that cleanup happened correctly.
         useRealKinesis = Boolean.parseBoolean(System.getProperty("run.with.real.kinesis", "false"));
 
-        System.setProperty(SDKGlobalConfiguration.AWS_CBOR_DISABLE_SYSTEM_PROPERTY, "true");
-        // with the jackson versions we use (2.11.x) Localstack doesn't without disabling CBOR
+        System.setProperty(SdkSystemSetting.CBOR_ENABLED.property(), "false");
+        // with the jackson versions we use (2.11.x) Localstack doesn't work without disabling CBOR
         // https://github.com/localstack/localstack/issues/3208
 
         if (useRealKinesis) {
@@ -106,13 +105,13 @@ public class KinesisIntegrationTest extends AbstractKinesisTest {
                     .withRegion(LOCALSTACK.getRegion())
                     .withCredentials(LOCALSTACK.getAccessKey(), LOCALSTACK.getSecretKey());
         }
-        KINESIS = AWS_CONFIG.buildClient();
-        HELPER = new KinesisTestHelper(KINESIS, STREAM, Logger.getLogger(KinesisIntegrationTest.class));
+        CLIENT = AWS_CONFIG.buildSyncClient();
+        HELPER = new KinesisTestHelper(CLIENT, STREAM, Logger.getLogger(KinesisIntegrationTest.class));
     }
 
     @AfterClass
     public static void afterClass() {
-        KINESIS.shutdown();
+        CLIENT.close();
     }
 
     @Test
@@ -366,18 +365,6 @@ public class KinesisIntegrationTest extends AbstractKinesisTest {
     }
 
     @Test
-    @Ignore
-    //
-    // Kinesis seems to mess up the timestamps internally somehow, don't know the exact reason...
-    //
-    // The error we get is: The timestampInMillis parameter cannot be greater than the currentTimestampInMillis.
-    // timestampInMillis: 1610448760259000, currentTimestampInMillis: 1610448760774
-    // (Service: AmazonKinesis; Status Code: 400; Error Code: InvalidArgumentException
-    //
-    // We seem to be sending the right request, not sure what causes the problem.
-    //
-    // Happens with latest AWS SDK too.
-    //
     public void initialRead_timestamp() {
         HELPER.createStream(1);
 
@@ -478,13 +465,13 @@ public class KinesisIntegrationTest extends AbstractKinesisTest {
         HELPER.createStream(1);
 
         //send out some records, make sure they are in the shard
-        PutRecordsResult putRecordsResult = HELPER.putRecords(messages(0, 100));
+        PutRecordsResponse putRecordsResponse = HELPER.putRecords(messages(0, 100));
         Job initialJob = jet().newJob(getPipeline(kinesisSource().build()));
         assertMessages(expectedMessages(0, 100), true, false);
         initialJob.cancel();
         results.clear();
 
-        String sequenceNumber = putRecordsResult.getRecords().get(50).getSequenceNumber();
+        String sequenceNumber = putRecordsResponse.records().get(50).sequenceNumber();
 
         //start a new job which reads records from the sequence nomber (inclusive)
         StreamSource<Map.Entry<String, byte[]>> source = kinesisSource()
@@ -499,13 +486,13 @@ public class KinesisIntegrationTest extends AbstractKinesisTest {
         HELPER.createStream(1);
 
         //send out some records, make sure they are in the shard
-        PutRecordsResult putRecordsResult = HELPER.putRecords(messages(0, 100));
+        PutRecordsResponse putRecordsResponse = HELPER.putRecords(messages(0, 100));
         Job initialJob = jet().newJob(getPipeline(kinesisSource().build()));
         assertMessages(expectedMessages(0, 100), true, false);
         initialJob.cancel();
         results.clear();
 
-        String sequenceNumber = putRecordsResult.getRecords().get(50).getSequenceNumber();
+        String sequenceNumber = putRecordsResponse.records().get(50).sequenceNumber();
 
         //start a new job which reads records from the sequence nomber (inclusive)
         StreamSource<Map.Entry<String, byte[]>> source = kinesisSource()
@@ -517,10 +504,10 @@ public class KinesisIntegrationTest extends AbstractKinesisTest {
 
     private void assertOpenShards(int count, Shard... excludedShards) {
         assertTrueEventually(() -> {
-            Set<String> openShards = listOpenShards().stream().map(Shard::getShardId).collect(Collectors.toSet());
+            Set<String> openShards = listOpenShards().stream().map(Shard::shardId).collect(Collectors.toSet());
             assertEquals(count, openShards.size());
             for (Shard excludedShard : excludedShards) {
-                assertFalse(openShards.contains(excludedShard.getShardId()));
+                assertFalse(openShards.contains(excludedShard.shardId()));
             }
         });
 

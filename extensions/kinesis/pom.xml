@@ -33,7 +33,8 @@
     </parent>
 
     <properties>
-        <aws.bundle.sdk.version>1.11.934</aws.bundle.sdk.version>
+        <aws.kinesis.sdk2.version>2.15.62</aws.kinesis.sdk2.version>
+        <aws.kinesis.sdk1.version>1.11.937</aws.kinesis.sdk1.version>
         <testcontainers.version>1.15.1</testcontainers.version>
         <log4j2.slf4j.binding.version>2.13.2</log4j2.slf4j.binding.version>
     </properties>
@@ -52,62 +53,32 @@
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>${maven.assembly.plugin.version}</version>
                 <executions>
                     <execution>
+                        <id>distro-assembly</id>
                         <phase>package</phase>
                         <goals>
-                            <goal>shade</goal>
+                            <goal>single</goal>
                         </goals>
+                        <configuration>
+                            <descriptorRefs>
+                                <descriptorRef>jar-with-dependencies</descriptorRef>
+                            </descriptorRefs>
+                            <tarLongFileMode>posix</tarLongFileMode>
+                        </configuration>
                     </execution>
                 </executions>
-                <configuration>
-                    <createSourcesJar>true</createSourcesJar>
-                    <shadeSourcesContent>true</shadeSourcesContent>
-                    <createDependencyReducedPom>true</createDependencyReducedPom>
-                    <shadedArtifactAttached>true</shadedArtifactAttached>
-                    <shadedClassifierName>jar-with-dependencies</shadedClassifierName>
-                    <relocations>
-                        <relocation>
-                            <pattern>com.amazonaws</pattern>
-                            <shadedPattern>com.hazelcast.com.amazonaws</shadedPattern>
-                        </relocation>
-                    </relocations>
-                    <transformers>
-                        <transformer
-                            implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer" />
-                        <transformer
-                            implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer" />
-                        <transformer
-                            implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
-                    </transformers>
-                    <filters>
-                        <filter>
-                            <artifact>*:*</artifact>
-                            <excludes>
-                                <exclude>META-INF/*.SF</exclude>
-                                <exclude>META-INF/*.DSA</exclude>
-                                <exclude>META-INF/*.RSA</exclude>
-                            </excludes>
-                        </filter>
-                    </filters>
-                </configuration>
             </plugin>
         </plugins>
     </build>
 
     <dependencies>
         <dependency>
-            <groupId>com.amazonaws</groupId>
-            <artifactId>aws-java-sdk-kinesis</artifactId>
-            <version>${aws.bundle.sdk.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.fasterxml.jackson.dataformat</groupId>
-            <artifactId>jackson-dataformat-cbor</artifactId>
-            <version>${jackson.version}</version>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>kinesis</artifactId>
+            <version>${aws.kinesis.sdk2.version}</version>
         </dependency>
 
         <!-- TEST -->
@@ -115,6 +86,14 @@
             <groupId>org.testcontainers</groupId>
             <artifactId>localstack</artifactId>
             <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- needed by Localstack at runtime -->
+        <dependency>
+            <groupId>com.amazonaws</groupId>
+            <artifactId>aws-java-sdk-kinesis</artifactId>
+            <version>${aws.kinesis.sdk1.version}</version>
             <scope>test</scope>
         </dependency>
 

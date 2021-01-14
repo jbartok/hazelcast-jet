@@ -15,8 +15,8 @@
  */
 package com.hazelcast.jet.kinesis.impl;
 
-import com.amazonaws.services.kinesis.model.Shard;
 import org.junit.Test;
+import software.amazon.awssdk.services.kinesis.model.Shard;
 
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
@@ -29,7 +29,7 @@ public class ShardQueueTest {
         assertNull(q.pollAdded());
         assertNull(q.pollExpired());
 
-        Shard shard = new Shard();
+        Shard shard = Shard.builder().build();
         q.addAdded(shard);
         assertNull(q.pollExpired());
         assertSame(shard, q.pollAdded());

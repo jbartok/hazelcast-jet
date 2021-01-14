@@ -16,13 +16,13 @@
 
 package com.hazelcast.jet.kinesis.impl;
 
-import com.amazonaws.services.kinesis.model.GetShardIteratorRequest;
-import com.amazonaws.services.kinesis.model.SequenceNumberRange;
-import com.amazonaws.services.kinesis.model.Shard;
-import com.amazonaws.services.kinesis.model.ShardIteratorType;
 import org.junit.Test;
+import software.amazon.awssdk.services.kinesis.model.GetShardIteratorRequest;
+import software.amazon.awssdk.services.kinesis.model.SequenceNumberRange;
+import software.amazon.awssdk.services.kinesis.model.Shard;
+import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
-import java.util.Date;
+import java.time.Instant;
 
 import static org.junit.Assert.assertEquals;
 
@@ -40,11 +40,12 @@ public class InitialShardIteratorsTest {
     @Test
     public void unspecified() {
         assertEquals(
-                new GetShardIteratorRequest()
-                        .withShardId(SHARD3.getShardId())
-                        .withStreamName(STREAM)
-                        .withShardIteratorType(ShardIteratorType.AT_SEQUENCE_NUMBER)
-                        .withStartingSequenceNumber("1500"),
+                GetShardIteratorRequest.builder()
+                        .shardId(SHARD3.shardId())
+                        .streamName(STREAM)
+                        .shardIteratorType(ShardIteratorType.AT_SEQUENCE_NUMBER)
+                        .startingSequenceNumber("1500")
+                        .build(),
                 iterators.request(STREAM, SHARD3)
         );
     }
@@ -53,10 +54,11 @@ public class InitialShardIteratorsTest {
     public void latest() {
         iterators.add(".*", ShardIteratorType.LATEST.name(), null);
         assertEquals(
-                new GetShardIteratorRequest()
-                        .withShardId(SHARD0.getShardId())
-                        .withStreamName(STREAM)
-                        .withShardIteratorType(ShardIteratorType.LATEST),
+                GetShardIteratorRequest.builder()
+                        .shardId(SHARD0.shardId())
+                        .streamName(STREAM)
+                        .shardIteratorType(ShardIteratorType.LATEST)
+                        .build(),
                 iterators.request(STREAM, SHARD0)
         );
     }
@@ -65,10 +67,11 @@ public class InitialShardIteratorsTest {
     public void oldest() {
         iterators.add(".*", ShardIteratorType.TRIM_HORIZON.name(), null);
         assertEquals(
-                new GetShardIteratorRequest()
-                        .withShardId(SHARD0.getShardId())
-                        .withStreamName(STREAM)
-                        .withShardIteratorType(ShardIteratorType.TRIM_HORIZON),
+                GetShardIteratorRequest.builder()
+                        .shardId(SHARD0.shardId())
+                        .streamName(STREAM)
+                        .shardIteratorType(ShardIteratorType.TRIM_HORIZON)
+                        .build(),
                 iterators.request(STREAM, SHARD0)
         );
     }
@@ -78,11 +81,12 @@ public class InitialShardIteratorsTest {
         long currentTimeMillis = System.currentTimeMillis();
         iterators.add(".*", ShardIteratorType.AT_TIMESTAMP.name(), Long.toString(currentTimeMillis));
         assertEquals(
-                new GetShardIteratorRequest()
-                        .withShardId(SHARD0.getShardId())
-                        .withStreamName(STREAM)
-                        .withShardIteratorType(ShardIteratorType.AT_TIMESTAMP)
-                        .withTimestamp(new Date(currentTimeMillis)),
+                GetShardIteratorRequest.builder()
+                        .shardId(SHARD0.shardId())
+                        .streamName(STREAM)
+                        .shardIteratorType(ShardIteratorType.AT_TIMESTAMP)
+                        .timestamp(Instant.ofEpochMilli(currentTimeMillis))
+                        .build(),
                 iterators.request(STREAM, SHARD0)
         );
     }
@@ -92,11 +96,12 @@ public class InitialShardIteratorsTest {
         String seqNo = "12345";
         iterators.add(".*", ShardIteratorType.AT_SEQUENCE_NUMBER.name(), seqNo);
         assertEquals(
-                new GetShardIteratorRequest()
-                        .withShardId(SHARD0.getShardId())
-                        .withStreamName(STREAM)
-                        .withShardIteratorType(ShardIteratorType.AT_SEQUENCE_NUMBER)
-                        .withStartingSequenceNumber(seqNo),
+                GetShardIteratorRequest.builder()
+                        .shardId(SHARD0.shardId())
+                        .streamName(STREAM)
+                        .shardIteratorType(ShardIteratorType.AT_SEQUENCE_NUMBER)
+                        .startingSequenceNumber(seqNo)
+                        .build(),
                 iterators.request(STREAM, SHARD0)
         );
     }
@@ -106,43 +111,47 @@ public class InitialShardIteratorsTest {
         String seqNo = "12345";
         iterators.add(".*", ShardIteratorType.AFTER_SEQUENCE_NUMBER.name(), seqNo);
         assertEquals(
-                new GetShardIteratorRequest()
-                        .withShardId(SHARD0.getShardId())
-                        .withStreamName(STREAM)
-                        .withShardIteratorType(ShardIteratorType.AFTER_SEQUENCE_NUMBER)
-                        .withStartingSequenceNumber(seqNo),
+                GetShardIteratorRequest.builder()
+                        .shardId(SHARD0.shardId())
+                        .streamName(STREAM)
+                        .shardIteratorType(ShardIteratorType.AFTER_SEQUENCE_NUMBER)
+                        .startingSequenceNumber(seqNo)
+                        .build(),
                 iterators.request(STREAM, SHARD0)
         );
     }
 
     @Test
     public void sequentialCheck() {
-        iterators.add(SHARD1.getShardId(), ShardIteratorType.LATEST.name(), null);
-        iterators.add(SHARD3.getShardId(), ShardIteratorType.TRIM_HORIZON.name(), null);
+        iterators.add(SHARD1.shardId(), ShardIteratorType.LATEST.name(), null);
+        iterators.add(SHARD3.shardId(), ShardIteratorType.TRIM_HORIZON.name(), null);
         iterators.add(".*", ShardIteratorType.AT_SEQUENCE_NUMBER.name(), "9999");
 
         assertEquals(
-                new GetShardIteratorRequest()
-                        .withShardId(SHARD2.getShardId())
-                        .withStreamName(STREAM)
-                        .withShardIteratorType(ShardIteratorType.AT_SEQUENCE_NUMBER)
-                        .withStartingSequenceNumber("9999"),
+                GetShardIteratorRequest.builder()
+                        .shardId(SHARD2.shardId())
+                        .streamName(STREAM)
+                        .shardIteratorType(ShardIteratorType.AT_SEQUENCE_NUMBER)
+                        .startingSequenceNumber("9999")
+                        .build(),
                 iterators.request(STREAM, SHARD2)
         ); //matches last
         assertEquals(
-                new GetShardIteratorRequest()
-                        .withShardId(SHARD1.getShardId())
-                        .withStreamName(STREAM)
-                        .withShardIteratorType(ShardIteratorType.LATEST),
+                GetShardIteratorRequest.builder()
+                        .shardId(SHARD1.shardId())
+                        .streamName(STREAM)
+                        .shardIteratorType(ShardIteratorType.LATEST)
+                        .build(),
                 iterators.request(STREAM, SHARD1)
         ); //matches first
     }
 
     private static Shard shard(String id, long startHashKey, long endHashKey) {
-        SequenceNumberRange sequenceNumberRange = new SequenceNumberRange()
-                .withStartingSequenceNumber(Long.toString(startHashKey))
-                .withEndingSequenceNumber(Long.toString(endHashKey));
-        return new Shard().withShardId(id).withSequenceNumberRange(sequenceNumberRange);
+        SequenceNumberRange sequenceNumberRange = SequenceNumberRange.builder()
+                .startingSequenceNumber(Long.toString(startHashKey))
+                .endingSequenceNumber(Long.toString(endHashKey))
+                .build();
+        return Shard.builder().shardId(id).sequenceNumberRange(sequenceNumberRange).build();
     }
 
 }

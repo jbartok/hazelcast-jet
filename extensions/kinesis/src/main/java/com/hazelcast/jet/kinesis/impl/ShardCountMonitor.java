@@ -15,12 +15,12 @@
  */
 package com.hazelcast.jet.kinesis.impl;
 
-import com.amazonaws.SdkClientException;
-import com.amazonaws.services.kinesis.AmazonKinesisAsync;
-import com.amazonaws.services.kinesis.model.DescribeStreamSummaryResult;
-import com.amazonaws.services.kinesis.model.StreamDescriptionSummary;
 import com.hazelcast.jet.retry.RetryStrategy;
 import com.hazelcast.logging.ILogger;
+import software.amazon.awssdk.core.exception.SdkClientException;
+import software.amazon.awssdk.services.kinesis.KinesisAsyncClient;
+import software.amazon.awssdk.services.kinesis.model.DescribeStreamSummaryResponse;
+import software.amazon.awssdk.services.kinesis.model.StreamDescriptionSummary;
 
 import javax.annotation.Nonnull;
 import java.util.concurrent.Future;
@@ -46,17 +46,17 @@ public class ShardCountMonitor extends AbstractShardWorker {
     private final RandomizedRateTracker describeStreamRateTracker;
     private final RetryTracker describeStreamRetryTracker;
 
-    private Future<DescribeStreamSummaryResult> describeStreamResult;
+    private Future<DescribeStreamSummaryResponse> describeStreamResponse;
     private long nextDescribeStreamTime;
 
     public ShardCountMonitor(
             int totalInstances,
-            AmazonKinesisAsync kinesis,
+            KinesisAsyncClient client,
             String stream,
             RetryStrategy retryStrategy,
             ILogger logger
     ) {
-        super(kinesis, stream, logger);
+        super(client, stream, logger);
         this.shardCount = new AtomicInteger();
         this.describeStreamRetryTracker = new RetryTracker(retryStrategy);
         this.describeStreamRateTracker = initRandomizedTracker(totalInstances);
@@ -72,7 +72,7 @@ public class ShardCountMonitor extends AbstractShardWorker {
 
 
     public void run() {
-        if (describeStreamResult == null) {
+        if (describeStreamResponse == null) {
             initDescribeStream();
         } else {
             checkForStreamDescription();
@@ -92,32 +92,32 @@ public class ShardCountMonitor extends AbstractShardWorker {
         if (currentTime < nextDescribeStreamTime) {
             return;
         }
-        describeStreamResult = helper.describeStreamSummaryAsync();
+        describeStreamResponse = helper.describeStreamSummaryAsync();
         nextDescribeStreamTime = currentTime + describeStreamRateTracker.next();
     }
 
     private void checkForStreamDescription() {
-        if (describeStreamResult.isDone()) {
-            DescribeStreamSummaryResult result;
+        if (describeStreamResponse.isDone()) {
+            DescribeStreamSummaryResponse response;
             try {
-                result = helper.readResult(describeStreamResult);
+                response = helper.readResult(describeStreamResponse);
             } catch (SdkClientException e) {
                 dealWithDescribeStreamFailure(e);
                 return;
             } catch (Throwable t) {
                 throw rethrow(t);
             } finally {
-                describeStreamResult = null;
+                describeStreamResponse = null;
             }
 
             describeStreamRetryTracker.reset();
 
-            StreamDescriptionSummary streamDescription = result.getStreamDescriptionSummary();
+            StreamDescriptionSummary streamDescription = response.streamDescriptionSummary();
             if (streamDescription == null) {
                 return;
             }
 
-            Integer newShardCount = streamDescription.getOpenShardCount();
+            Integer newShardCount = streamDescription.openShardCount();
             if (newShardCount == null) {
                 return;
             }

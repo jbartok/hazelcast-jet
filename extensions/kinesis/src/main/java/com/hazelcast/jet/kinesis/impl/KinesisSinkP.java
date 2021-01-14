@@ -15,12 +15,6 @@
  */
 package com.hazelcast.jet.kinesis.impl;
 
-import com.amazonaws.SdkClientException;
-import com.amazonaws.services.kinesis.AmazonKinesisAsync;
-import com.amazonaws.services.kinesis.model.ProvisionedThroughputExceededException;
-import com.amazonaws.services.kinesis.model.PutRecordsRequestEntry;
-import com.amazonaws.services.kinesis.model.PutRecordsResult;
-import com.amazonaws.services.kinesis.model.PutRecordsResultEntry;
 import com.hazelcast.function.FunctionEx;
 import com.hazelcast.internal.metrics.Probe;
 import com.hazelcast.internal.metrics.ProbeUnit;
@@ -34,10 +28,16 @@ import com.hazelcast.jet.core.Watermark;
 import com.hazelcast.jet.kinesis.KinesisSinks;
 import com.hazelcast.jet.retry.RetryStrategy;
 import com.hazelcast.logging.ILogger;
+import software.amazon.awssdk.core.SdkBytes;
+import software.amazon.awssdk.core.exception.SdkClientException;
+import software.amazon.awssdk.services.kinesis.KinesisAsyncClient;
+import software.amazon.awssdk.services.kinesis.model.ProvisionedThroughputExceededException;
+import software.amazon.awssdk.services.kinesis.model.PutRecordsRequestEntry;
+import software.amazon.awssdk.services.kinesis.model.PutRecordsResponse;
+import software.amazon.awssdk.services.kinesis.model.PutRecordsResultEntry;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Future;
@@ -75,7 +75,7 @@ public class KinesisSinkP<T> implements Processor {
     private static final int MAX_REQUEST_SIZE_IN_BYTES = 5 * 1024 * 1024;
 
     @Nonnull
-    private final AmazonKinesisAsync kinesis;
+    private final KinesisAsyncClient client;
     @Nonnull
     private final String stream;
     @Nonnull
@@ -93,21 +93,21 @@ public class KinesisSinkP<T> implements Processor {
     private int shardCount;
     private int sinkCount;
 
-    private Future<PutRecordsResult> sendResult;
+    private Future<PutRecordsResponse> sendResponse;
     private long nextSendTime = nanoTime();
     private final RetryTracker sendRetryTracker;
 
     private final ThroughputController throughputController = new ThroughputController();
 
     public KinesisSinkP(
-            @Nonnull AmazonKinesisAsync kinesis,
+            @Nonnull KinesisAsyncClient client,
             @Nonnull String stream,
             @Nonnull FunctionEx<T, String> keyFn,
             @Nonnull FunctionEx<T, byte[]> valueFn,
             @Nonnull ShardCountMonitor monitor,
             @Nonnull RetryStrategy retryStrategy
             ) {
-        this.kinesis = kinesis;
+        this.client = client;
         this.stream = stream;
         this.monitor = monitor;
         this.buffer = new Buffer<>(keyFn, valueFn);
@@ -124,7 +124,7 @@ public class KinesisSinkP<T> implements Processor {
     public void init(@Nonnull Outbox outbox, @Nonnull Context context) {
         logger = context.logger();
         sinkCount = context.totalParallelism();
-        helper = new KinesisHelper(kinesis, stream);
+        helper = new KinesisHelper(client, stream);
     }
 
     @Override
@@ -138,20 +138,20 @@ public class KinesisSinkP<T> implements Processor {
 
         updateThroughputLimitations();
 
-        if (sendResult != null) {
+        if (sendResponse != null) {
             checkIfSendingFinished();
         }
-        if (sendResult == null) {
+        if (sendResponse == null) {
             initSending(inbox);
         }
     }
 
     @Override
     public boolean complete() {
-        if (sendResult != null) {
+        if (sendResponse != null) {
             checkIfSendingFinished();
         }
-        if (sendResult == null) {
+        if (sendResponse == null) {
             if (buffer.isEmpty()) {
                 return true;
             }
@@ -162,10 +162,10 @@ public class KinesisSinkP<T> implements Processor {
 
     @Override
     public boolean saveToSnapshot() {
-        if (sendResult != null) {
+        if (sendResponse != null) {
             checkIfSendingFinished();
         }
-        return sendResult == null;
+        return sendResponse == null;
     }
 
     private void updateThroughputLimitations() {
@@ -202,15 +202,15 @@ public class KinesisSinkP<T> implements Processor {
         }
 
         List<PutRecordsRequestEntry> entries = buffer.content();
-        sendResult = helper.putRecordsAsync(entries);
+        sendResponse = helper.putRecordsAsync(entries);
         nextSendTime = currentTime;
     }
 
     private void checkIfSendingFinished() {
-        if (sendResult.isDone()) {
-            PutRecordsResult result;
+        if (sendResponse.isDone()) {
+            PutRecordsResponse response;
             try {
-                result = helper.readResult(this.sendResult);
+                response = helper.readResult(this.sendResponse);
             } catch (ProvisionedThroughputExceededException pte) {
                 dealWithThroughputExceeded("Data throughput rate exceeded. Backing off and retrying in %d ms");
                 return;
@@ -220,13 +220,13 @@ public class KinesisSinkP<T> implements Processor {
             } catch (Throwable t) {
                 throw rethrow(t);
             } finally {
-                sendResult = null;
+                sendResponse = null;
             }
 
-            pruneSentFromBuffer(result);
-            if (result.getFailedRecordCount() > 0) {
-                dealWithThroughputExceeded("Failed to send " + result.getFailedRecordCount() + " (out of " +
-                        result.getRecords().size() + ") record(s) to stream '" + stream +
+            pruneSentFromBuffer(response);
+            if (response.failedRecordCount() > 0) {
+                dealWithThroughputExceeded("Failed to send " + response.failedRecordCount() + " (out of " +
+                        response.records().size() + ") record(s) to stream '" + stream +
                         "'. Sending will be retried in %d ms, message reordering is likely.");
             } else {
                 long sleepTimeNanos = throughputController.markSuccess();
@@ -257,13 +257,13 @@ public class KinesisSinkP<T> implements Processor {
         logger.warning(String.format(message, NANOSECONDS.toMillis(sleepTimeNanos)));
     }
 
-    private void pruneSentFromBuffer(@Nullable PutRecordsResult result) {
-        if (result == null) {
+    private void pruneSentFromBuffer(@Nullable PutRecordsResponse response) {
+        if (response == null) {
             return;
         }
 
-        List<PutRecordsResultEntry> resultEntries = result.getRecords();
-        if (result.getFailedRecordCount() > 0) {
+        List<PutRecordsResultEntry> resultEntries = response.records();
+        if (response.failedRecordCount() > 0) {
             buffer.retainFailedEntries(resultEntries);
         } else {
             buffer.clear();
@@ -336,7 +336,7 @@ public class KinesisSinkP<T> implements Processor {
 
             int startIndex = 0;
             for (int index = 0; index < results.size(); index++) {
-                if (results.get(index).getErrorCode() != null) {
+                if (results.get(index).errorCode() != null) {
                     swap(startIndex++, index);
                 } else {
                     totalEntrySize -= entries[index].encodedSize;
@@ -391,21 +391,10 @@ public class KinesisSinkP<T> implements Processor {
         private int encodedSize;
 
         public void set(String partitionKey, byte[] data, int size) {
-            if (putRecordsRequestEntry == null) {
-                putRecordsRequestEntry = new PutRecordsRequestEntry();
-            }
-
-            putRecordsRequestEntry.setPartitionKey(partitionKey);
-
-            ByteBuffer byteBuffer = putRecordsRequestEntry.getData();
-            if (byteBuffer == null || byteBuffer.capacity() < data.length) {
-                putRecordsRequestEntry.setData(ByteBuffer.wrap(data));
-            } else {
-                ((java.nio.Buffer) byteBuffer).clear(); //cast needed due to JDK 9 breaking compatibility
-                byteBuffer.put(data);
-                ((java.nio.Buffer) byteBuffer).flip(); //cast needed due to JDK 9 breaking compatibility
-            }
-
+            putRecordsRequestEntry = PutRecordsRequestEntry.builder()
+                    .partitionKey(partitionKey)
+                    .data(SdkBytes.fromByteArray(data))
+                    .build();
             encodedSize = size;
         }
     }

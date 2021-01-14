@@ -15,21 +15,21 @@
  */
 package com.hazelcast.jet.kinesis.impl;
 
-import com.amazonaws.services.kinesis.AmazonKinesisAsync;
-import com.amazonaws.services.kinesis.model.DescribeStreamSummaryRequest;
-import com.amazonaws.services.kinesis.model.DescribeStreamSummaryResult;
-import com.amazonaws.services.kinesis.model.GetRecordsRequest;
-import com.amazonaws.services.kinesis.model.GetRecordsResult;
-import com.amazonaws.services.kinesis.model.GetShardIteratorRequest;
-import com.amazonaws.services.kinesis.model.GetShardIteratorResult;
-import com.amazonaws.services.kinesis.model.ListShardsRequest;
-import com.amazonaws.services.kinesis.model.ListShardsResult;
-import com.amazonaws.services.kinesis.model.PutRecordsRequest;
-import com.amazonaws.services.kinesis.model.PutRecordsRequestEntry;
-import com.amazonaws.services.kinesis.model.PutRecordsResult;
-import com.amazonaws.services.kinesis.model.Shard;
-import com.amazonaws.services.kinesis.model.ShardFilter;
-import com.amazonaws.services.kinesis.model.ShardFilterType;
+import software.amazon.awssdk.services.kinesis.KinesisAsyncClient;
+import software.amazon.awssdk.services.kinesis.model.DescribeStreamSummaryRequest;
+import software.amazon.awssdk.services.kinesis.model.DescribeStreamSummaryResponse;
+import software.amazon.awssdk.services.kinesis.model.GetRecordsRequest;
+import software.amazon.awssdk.services.kinesis.model.GetRecordsResponse;
+import software.amazon.awssdk.services.kinesis.model.GetShardIteratorRequest;
+import software.amazon.awssdk.services.kinesis.model.GetShardIteratorResponse;
+import software.amazon.awssdk.services.kinesis.model.ListShardsRequest;
+import software.amazon.awssdk.services.kinesis.model.ListShardsResponse;
+import software.amazon.awssdk.services.kinesis.model.PutRecordsRequest;
+import software.amazon.awssdk.services.kinesis.model.PutRecordsRequestEntry;
+import software.amazon.awssdk.services.kinesis.model.PutRecordsResponse;
+import software.amazon.awssdk.services.kinesis.model.Shard;
+import software.amazon.awssdk.services.kinesis.model.ShardFilter;
+import software.amazon.awssdk.services.kinesis.model.ShardFilterType;
 import com.hazelcast.jet.JetException;
 
 import javax.annotation.Nonnull;
@@ -41,22 +41,22 @@ import java.util.concurrent.Future;
 
 public class KinesisHelper {
 
-    private final AmazonKinesisAsync kinesis;
+    private final KinesisAsyncClient client;
     private final String stream;
 
-    public KinesisHelper(AmazonKinesisAsync kinesis, String stream) {
-        this.kinesis = kinesis;
+    public KinesisHelper(KinesisAsyncClient client, String stream) {
+        this.client = client;
         this.stream = stream;
     }
 
     public static boolean shardActive(@Nonnull Shard shard) {
-        String endingSequenceNumber = shard.getSequenceNumberRange().getEndingSequenceNumber();
+        String endingSequenceNumber = shard.sequenceNumberRange().endingSequenceNumber();
         return endingSequenceNumber == null;
         //need to rely on this hack, because shard filters don't seem to work, on the mock at least ...
     }
 
     public static boolean shardBelongsToRange(@Nonnull Shard shard, @Nonnull HashRange range) {
-        BigInteger startingHashKey = new BigInteger(shard.getHashKeyRange().getStartingHashKey());
+        BigInteger startingHashKey = new BigInteger(shard.hashKeyRange().startingHashKey());
         return shardBelongsToRange(startingHashKey, range);
     }
 
@@ -69,48 +69,44 @@ public class KinesisHelper {
             @Nullable String nextToken,
             ShardFilterType filterType
     ) {
-        ListShardsRequest request = new ListShardsRequest();
+        ListShardsRequest.Builder request = ListShardsRequest.builder();
         if (nextToken == null) {
-            request.setStreamName(stream);
+            request.streamName(stream);
         } else {
-            request.setNextToken(nextToken);
+            request.nextToken(nextToken);
         }
 
         //include all the shards within the retention period of the data stream
-        request.setShardFilter(new ShardFilter().withType(filterType));
+        request.shardFilter(ShardFilter.builder().type(filterType).build());
 
-        return request;
+        return request.build();
     }
 
-    public Future<DescribeStreamSummaryResult> describeStreamSummaryAsync() {
-        DescribeStreamSummaryRequest request = new DescribeStreamSummaryRequest();
-        request.setStreamName(stream);
-        return kinesis.describeStreamSummaryAsync(request);
+    public Future<DescribeStreamSummaryResponse> describeStreamSummaryAsync() {
+        DescribeStreamSummaryRequest request = DescribeStreamSummaryRequest.builder().streamName(stream).build();
+        return client.describeStreamSummary(request);
     }
 
-    public Future<ListShardsResult> listAllShardsAsync(String nextToken) {
+    public Future<ListShardsResponse> listAllShardsAsync(String nextToken) {
         ShardFilterType filterType = ShardFilterType.FROM_TRIM_HORIZON;
         //all shards within the retention period (including closed, excluding expired)
 
         ListShardsRequest request = listAllShardsRequest(stream, nextToken, filterType);
-        return kinesis.listShardsAsync(request);
+        return client.listShards(request);
     }
 
-    public Future<GetShardIteratorResult> getShardIteratorAsync(GetShardIteratorRequest request) {
-        return kinesis.getShardIteratorAsync(request);
+    public Future<GetShardIteratorResponse> getShardIteratorAsync(GetShardIteratorRequest request) {
+        return client.getShardIterator(request);
     }
 
-    public Future<GetRecordsResult> getRecordsAsync(String shardIterator) {
-        GetRecordsRequest request = new GetRecordsRequest();
-        request.setShardIterator(shardIterator);
-        return kinesis.getRecordsAsync(request);
+    public Future<GetRecordsResponse> getRecordsAsync(String shardIterator) {
+        GetRecordsRequest request = GetRecordsRequest.builder().shardIterator(shardIterator).build();
+        return client.getRecords(request);
     }
 
-    public Future<PutRecordsResult> putRecordsAsync(Collection<PutRecordsRequestEntry> entries) {
-        PutRecordsRequest request = new PutRecordsRequest();
-        request.setRecords(entries);
-        request.setStreamName(stream);
-        return kinesis.putRecordsAsync(request);
+    public Future<PutRecordsResponse> putRecordsAsync(Collection<PutRecordsRequestEntry> entries) {
+        PutRecordsRequest request = PutRecordsRequest.builder().streamName(stream).records(entries).build();
+        return client.putRecords(request);
     }
 
     public <T> T readResult(Future<T> future) throws Throwable {
